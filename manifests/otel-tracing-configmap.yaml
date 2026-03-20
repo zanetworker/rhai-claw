@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openclaw-otel-tracing
+data:
+  otel-setup.js: |
+    // OTEL auto-setup for OpenClaw → MLflow tracing
+    // Loaded via NODE_OPTIONS="--require /otel/otel-setup.js"
+    // Resolves modules from /app/node_modules where OpenClaw's deps live
+    const Module = require("module");
+    const origResolve = Module._resolveFilename;
+    Module._resolveFilename = function(request, parent, isMain, options) {
+      try { return origResolve.call(this, request, parent, isMain, options); }
+      catch (e) {
+        if (request.startsWith("@opentelemetry/"))
+          return origResolve.call(this, "/app/node_modules/" + request, parent, isMain, options);
+        throw e;
+      }
+    };
+
+    const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    if (!endpoint) {
+      console.log("[otel-setup] OTEL_EXPORTER_OTLP_ENDPOINT not set, skipping");
+    } else {
+      const { NodeSDK } = require("@opentelemetry/sdk-node");
+      const { OTLPTraceExporter } = require("@opentelemetry/exporter-trace-otlp-proto");
+      const { resourceFromAttributes } = require("@opentelemetry/resources");
+
+      const sdk = new NodeSDK({
+        resource: resourceFromAttributes({
+          "service.name": process.env.OTEL_SERVICE_NAME || "openclaw",
+          "service.version": "2026.3.14",
+        }),
+        traceExporter: new OTLPTraceExporter({
+          url: endpoint + "/v1/traces",
+        }),
+      });
+
+      sdk.start();
+      console.log("[otel-setup] OTEL tracing started -> " + endpoint);
+
+      process.on("SIGTERM", () => sdk.shutdown());
+      process.on("SIGINT", () => sdk.shutdown());
+    }

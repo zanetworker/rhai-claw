@@ -8,3 +8,4 @@ resources:
 - route.yaml
 - agentruntime.yaml
 - agentcard-configmap.yaml
+- otel-tracing-configmap.yaml
