@@ -1,20 +1,18 @@
 # kagenti-claw
 
-**Every AI agent deserves a home. This is how you give it one.**
+**Bring Your Own Agent. We bring the platform.**
 
-Deploying an AI agent on Kubernetes today is a mess. You wrestle with configs, debug networking, chase down auth tokens, and by the time it's running, you've forgotten why you started. There are too many steps, too many things that break silently, and zero joy in the process.
+The AI agent world is messy. Teams reach for LangChain, CrewAI, AutoGen, or build from scratch. Good. That's the creative phase. But once an agent leaves a developer's laptop and starts talking to production data, calling external APIs, or running on shared infrastructure, freedom without guardrails stops being a feature and starts being a liability.
 
-kagenti-claw changes that. One command. One minute. Your agent is live.
+This repo is the companion to [Operationalizing "Bring Your Own Agent" on Red Hat AI, the OpenClaw edition](https://www.redhat.com/en/blog/operationalizing-bring-your-own-agent-red-hat-ai-openclaw-edition). It takes [OpenClaw](https://github.com/openclaw/openclaw), a personal AI assistant that routes agent interactions across channels (WhatsApp, Telegram, Slack, Discord) through a central WebSocket gateway, and operationalizes it on Kubernetes with [Kagenti](https://github.com/kagenti/kagenti-operator).
 
-## What You Get
+We aren't wrapping OpenClaw in a proprietary framework. We're wrapping it in platform infrastructure.
 
-Three things happen when you run `make deploy`:
+## The BYOA Principle
 
-1. **The Kagenti operator** lands in your cluster — the brain that manages agent lifecycles, discovery, and identity
-2. **OpenClaw** spins up as a managed agent — configured, routed, and ready to accept connections
-3. **Everything connects** — TLS route, gateway token, device pairing — all wired together
+The platform is framework-agnostic. What matters is that the agent has identity, runs under least-privilege, gets observed, passes safety checks, and can be audited after the fact. The platform provides security, governance, observability, and lifecycle management. The agent stays yours.
 
-You don't configure any of this. It just works.
+OpenClaw doesn't sandbox by default. It doesn't enforce RBAC, trace tool calls, or gate access to external services. Kagenti and Red Hat AI add each of those layers without touching the agent's code.
 
 ## Quick Start
 
@@ -24,7 +22,7 @@ cd kagenti-claw
 make deploy
 ```
 
-That's it. The output gives you your dashboard URL and gateway token.
+One command. The output gives you your dashboard URL and gateway token.
 
 Using Claude Code? Even simpler:
 
@@ -32,11 +30,41 @@ Using Claude Code? Even simpler:
 /deploy-openclaw
 ```
 
-The skill handles everything — operator installation, manifest application, token retrieval, device pairing approval — and hands you the keys.
+## What Gets Deployed
 
-## What It Looks Like
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Your Cluster                            │
+│                                                              │
+│  ┌────────────────┐           ┌───────────────────────────┐  │
+│  │    Kagenti     │  watches  │      OpenClaw Agent        │  │
+│  │    Operator    │──────────▶│   (Deployment + Service)   │  │
+│  │                │           │   Port 18789 (WebSocket)   │  │
+│  └───────┬────────┘           └─────────────┬─────────────┘  │
+│          │ creates                          │                 │
+│  ┌───────▼────────┐           ┌─────────────▼─────────────┐  │
+│  │  AgentRuntime  │           │   Route (TLS edge, 300s)  │  │
+│  │  (lifecycle)   │           │   ───▶ Dashboard URL       │  │
+│  └───────┬────────┘           └───────────────────────────┘  │
+│          │                                                    │
+│  ┌───────▼────────┐           ┌───────────────────────────┐  │
+│  │   AgentCard    │◀──────────│  ConfigMap (A2A schema)   │  │
+│  │  (discovery)   │  reads    │  openclaw-card-signed      │  │
+│  └────────────────┘           └───────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
 
-After deployment, your cluster has a fully managed AI agent:
+Three Kagenti primitives manage the agent's lifecycle:
+
+| Primitive | What it does |
+|-----------|-------------|
+| **AgentRuntime** | Attaches to an existing Deployment or StatefulSet. Applies labels, config hashes, and tracks pod readiness. The agent code is untouched. |
+| **AgentCard** | Discovers agent metadata via the A2A protocol. Supports HTTP fetch or ConfigMap-based injection for agents that don't natively serve `/.well-known/agent-card.json`. |
+| **ConfigMap (agent card)** | A static A2A agent card injected as `{agentName}-card-signed`. The Kagenti `ConfigMapFetcher` reads this before trying HTTP. No sidecar or image rebuild needed. |
+
+## After Deployment
+
+Your cluster has a fully managed, discoverable AI agent:
 
 ```
 $ kubectl get agentruntimes -n agents
@@ -50,34 +78,59 @@ NAME                       PROTOCOL   KIND         TARGET     VERIFIED   BOUND  
 openclaw-deployment-card   a2a        Deployment   openclaw                      True     2m
 ```
 
-The Kagenti operator automatically discovers your agent, creates an AgentCard, and begins syncing metadata via the A2A protocol.
+The AgentCard shows `SYNCED=True` because the operator found the `openclaw-card-signed` ConfigMap and loaded the A2A agent card schema from it. No HTTP endpoint was needed.
 
-## How It Works
+## How the AgentCard Gets Its Data
 
+Agents that speak A2A natively serve `/.well-known/agent-card.json` over HTTP. OpenClaw doesn't. Instead of building a sidecar or adapter, we use the Kagenti operator's **ConfigMap fetcher**.
+
+The `ConfigMapFetcher` in the Kagenti operator checks for a ConfigMap named `{agentName}-card-signed` with key `agent-card.json` in the agent's namespace **before** falling back to HTTP. This means:
+
+1. **No image rebuild** — the agent image stays untouched
+2. **No sidecar** — no extra container serving a static file
+3. **No A2A adapter** — no protocol translation layer
+
+You define the agent card as a ConfigMap:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openclaw-card-signed    # Must be {serviceName}-card-signed
+  namespace: agents
+data:
+  agent-card.json: |
+    {
+      "name": "OpenClaw",
+      "description": "Multi-channel AI gateway with extensible messaging integrations",
+      "version": "2026.3.14",
+      "url": "https://openclaw-agents.apps.your-cluster.com",
+      "capabilities": { "streaming": true, "pushNotifications": false },
+      "defaultInputModes": ["text/plain"],
+      "defaultOutputModes": ["text/plain"],
+      "skills": [
+        { "name": "chat", "description": "Conversational AI agent" },
+        { "name": "web-browsing", "description": "Browse and extract from web pages" },
+        { "name": "code-execution", "description": "Execute code and return results" }
+      ]
+    }
 ```
-┌─────────────────────────────────────────────────────┐
-│                  Your Cluster                        │
-│                                                      │
-│  ┌──────────────┐         ┌───────────────────────┐  │
-│  │   Kagenti    │ watches │    OpenClaw Agent      │  │
-│  │   Operator   │────────▶│  (Deployment + Svc)   │  │
-│  │              │         │    Port 18789 (WS)     │  │
-│  └──────┬───────┘         └───────────┬───────────┘  │
-│         │ creates                     │               │
-│  ┌──────▼───────┐         ┌───────────▼───────────┐  │
-│  │ AgentRuntime │         │    Route (TLS edge)    │  │
-│  │ AgentCard    │         │  ───▶ Dashboard URL    │  │
-│  └──────────────┘         └───────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-```
 
-OpenClaw runs as a standard Kubernetes Deployment with the `kagenti.io/type: agent` label. An init container configures the gateway to bind on `0.0.0.0` so the Service can reach it. The Route terminates TLS and forwards WebSocket traffic with a 300-second timeout.
+Apply it, and the AgentCard CR syncs automatically. This pattern works for any non-A2A agent.
 
-## Prerequisites
+## The Platform Layers (from the blog)
 
-- A Kubernetes cluster (v1.28+) — OpenShift for Route support, or bring your own Ingress
-- `kubectl` configured and connected
-- `helm` v4+ (the Makefile installs the Kagenti operator for you)
+This repo covers the deployment and discovery layer. The [blog series](https://www.redhat.com/en/blog/operationalizing-bring-your-own-agent-red-hat-ai-openclaw-edition) covers the full stack:
+
+| Layer | What it provides | Status |
+|-------|-----------------|--------|
+| **Isolation** | Sandboxed containers (Kata) for kernel-isolated agent sessions | Planned |
+| **Identity** | SPIFFE/SPIRE workload identity, scoped service-account tokens | Planned (Kagenti) |
+| **Lifecycle** | AgentRuntime + AgentCard CRDs for deploy, discover, observe | This repo |
+| **Observability** | MLflow tracing (OTEL-compatible) for prompts, tool calls, token costs | Developer preview |
+| **Safety** | Garak adversarial scanning, Guardrails Orchestrator, NeMo Guardrails | GA / Tech preview |
+| **Tool governance** | MCP Gateway (Envoy-based) with identity-based tool filtering | Developer preview |
+| **API surface** | OpenResponses-compatible runtime, vLLM chat completions | Available |
 
 ## Configuration
 
@@ -101,18 +154,29 @@ make deploy NAMESPACE=my-agents IMAGE=quay.io/aicatalyst/openclaw:20260320-d0ed2
 | `make status` | Show pod, AgentRuntime, and AgentCard status |
 | `make approve-pairing` | Approve pending dashboard device pairings |
 
+## Claude Code Skills
+
+| Skill | What it does |
+|-------|-------------|
+| `/deploy-openclaw` | Full automated deployment: operator, manifests, route, token, pairing |
+| `/setup-agentcard` | Generate and deploy an A2A agent card ConfigMap for any agent |
+
 ## Connecting to the Dashboard
 
 After `make deploy`, open the printed dashboard URL. Paste the gateway token, click Connect, then run `make approve-pairing` to authorize the session.
 
+## Prerequisites
+
+- A Kubernetes cluster (v1.28+) — OpenShift for Route support, or bring your own Ingress
+- `kubectl` configured and connected
+- `helm` v4+ (the Makefile installs the Kagenti operator for you)
+
 ## Related Projects
 
-- [**kagenti-operator**](https://github.com/kagenti/kagenti-operator) — The Kubernetes operator that powers agent lifecycle management, discovery, and identity
+- [**Kagenti Operator**](https://github.com/kagenti/kagenti-operator) — Agent lifecycle management, discovery, and identity for Kubernetes
+- [**kagenti-a2a-adapter**](https://github.com/zanetworker/kagenti-a2a-adapter) — Generate A2A protocol wrappers for non-A2A agents (CrewAI, LangGraph, OpenAI Agents SDK)
 - [**OpenClaw**](https://quay.io/repository/aicatalyst/openclaw) — Multi-channel AI gateway with extensible messaging integrations
-
-## One More Thing
-
-This entire repo — every manifest, every config, every line — was built by deploying OpenClaw on a live cluster, hitting every wall (wrong ports, loopback binds, missing TLS, pairing gates), and encoding the fixes so you never have to. The pain is done. Just deploy.
+- [**BYOA Blog Series**](https://www.redhat.com/en/blog/operationalizing-bring-your-own-agent-red-hat-ai-openclaw-edition) — The full walkthrough of operationalizing agents on Red Hat AI
 
 ## License
 
