@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openclaw-card-signed
+data:
+  agent-card.json: |
+    {
+      "name": "OpenClaw",
+      "description": "Multi-channel AI gateway with extensible messaging integrations. Supports Telegram, Discord, Slack, and more.",
+      "version": "2026.3.14",
+      "url": "https://openclaw-agents.apps.cluster-nrpwk.nrpwk.sandbox2474.opentlc.com",
+      "capabilities": {
+        "streaming": true,
+        "pushNotifications": false
+      },
+      "defaultInputModes": ["text/plain"],
+      "defaultOutputModes": ["text/plain"],
+      "skills": [
+        {
+          "name": "chat",
+          "description": "General-purpose conversational AI agent with multi-channel support",
+          "inputModes": ["text/plain"],
+          "outputModes": ["text/plain"]
+        },
+        {
+          "name": "web-browsing",
+          "description": "Browse the web, take screenshots, and extract information from web pages",
+          "inputModes": ["text/plain"],
+          "outputModes": ["text/plain", "image/png"]
+        },
+        {
+          "name": "code-execution",
+          "description": "Execute code snippets and return results",
+          "inputModes": ["text/plain"],
+          "outputModes": ["text/plain"]
+        }
+      ]
+    }
