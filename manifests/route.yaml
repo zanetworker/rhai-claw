@@ -1,0 +1,15 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: openclaw
+  annotations:
+    haproxy.router.openshift.io/timeout: 300s
+spec:
+  to:
+    kind: Service
+    name: openclaw
+  port:
+    targetPort: 18789
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

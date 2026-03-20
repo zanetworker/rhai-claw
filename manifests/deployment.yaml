@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openclaw
+  labels:
+    app.kubernetes.io/name: openclaw
+    kagenti.io/type: agent
+    protocol.kagenti.io/a2a: ""
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openclaw
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openclaw
+        kagenti.io/type: agent
+    spec:
+      initContainers:
+      - name: config-init
+        image: quay.io/aicatalyst/openclaw:latest
+        command:
+        - sh
+        - -c
+        - |
+          openclaw config set gateway.bind lan &&
+          openclaw config set gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback true
+        volumeMounts:
+        - name: openclaw-data
+          mountPath: /home/node/.openclaw
+      containers:
+      - name: agent
+        image: quay.io/aicatalyst/openclaw:latest
+        ports:
+        - containerPort: 18789
+        volumeMounts:
+        - name: openclaw-data
+          mountPath: /home/node/.openclaw
+      volumes:
+      - name: openclaw-data
+        emptyDir: {}
