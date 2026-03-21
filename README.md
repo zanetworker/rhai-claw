@@ -156,8 +156,16 @@ After `make deploy`, open the printed dashboard URL. Paste the gateway token, cl
 **Required:**
 - A Kubernetes cluster (v1.28+) — OpenShift for Route support, or bring your own Ingress
 - `kubectl` configured and connected to the cluster
+- An **Anthropic API key** — the skill asks you to create a Secret (never asks for the key directly)
+
+**With cluster-admin:**
 - `helm` v4+ installed locally (Helm v3.x does not support OCI charts)
-- An **Anthropic API key** — the `/deploy-openclaw` skill will ask for it and create a Secret. If you already have a Secret named `llm-keys` with an `anthropic` key in the `agents` namespace, it will be used automatically
+- The skill installs everything: operator, CRDs, webhook, namespace
+
+**Without cluster-admin:**
+- Ask your platform team to pre-install the Kagenti operator, CRDs, webhook, and create your namespace with `kagenti-enabled=true` label
+- The skill detects what's missing and tells you exactly what to ask for
+- Once the platform prerequisites are in place, the skill handles everything else with namespace-scoped permissions
 
 **Optional (for full observability):**
 - **MLflow** deployed on the cluster — the OTEL preload script sends traces to MLflow. If MLflow is not present, OpenClaw still works but without tracing. MLflow's `--allowed-hosts` must include the service hostname with port (e.g., `mlflow-service.test.svc.cluster.local:5000`)

@@ -16,11 +16,40 @@ One skill to deploy OpenClaw on Kagenti with full observability.
 
 Follow these steps sequentially. Report the output of each step.
 
-### 1. Check cluster connectivity
+### 1. Check cluster connectivity and permissions
 
 Run: `kubectl cluster-info`
 
 If this fails, stop and tell the user to configure kubectl access.
+
+Then check if the user has cluster-admin:
+```bash
+kubectl auth can-i create crd 2>/dev/null && echo "CLUSTER_ADMIN=true" || echo "CLUSTER_ADMIN=false"
+```
+
+If **not cluster-admin**, check that the platform prerequisites are already installed:
+```bash
+kubectl get ns kagenti-system 2>/dev/null && echo "Operator: OK" || echo "Operator: MISSING"
+kubectl get crd agentruntimes.agent.kagenti.dev 2>/dev/null && echo "AgentRuntime CRD: OK" || echo "AgentRuntime CRD: MISSING"
+kubectl get crd agentcards.agent.kagenti.dev 2>/dev/null && echo "AgentCards CRD: OK" || echo "AgentCards CRD: MISSING"
+kubectl get ns kagenti-webhook-system 2>/dev/null && echo "Webhook: OK" || echo "Webhook: MISSING"
+```
+
+If anything is MISSING, tell the user:
+
+> "You don't have cluster-admin permissions. The following platform components need to be installed by your cluster administrator before you can proceed:
+>
+> **Ask your platform team to run:**
+> 1. Install the Kagenti operator: `helm install kagenti-operator oci://ghcr.io/kagenti/kagenti-operator/kagenti-operator-chart --version 0.2.0-alpha.22 --namespace kagenti-system --create-namespace`
+> 2. Install the AgentRuntime CRD: `kubectl apply -f https://raw.githubusercontent.com/kagenti/kagenti-operator/main/kagenti-operator/config/crd/bases/agent.kagenti.dev_agentruntimes.yaml`
+> 3. Install the webhook: `kubectl apply -f manifests/webhook/webhook-all.yaml` (from the kagenti-claw repo)
+> 4. Create and label your namespace: `kubectl create ns <NAMESPACE> && kubectl label namespace <NAMESPACE> kagenti-enabled=true`
+>
+> Once these are in place, re-run `/deploy-openclaw`."
+
+Then **stop**. Do not proceed without the platform prerequisites.
+
+If cluster-admin or all prerequisites are present, continue.
 
 ### 2. Choose namespace
 
@@ -51,7 +80,9 @@ kubectl patch crd <CRD_NAME> --type=json -p '[{"op":"remove","path":"/metadata/f
 sleep 5
 ```
 
-### 4. Install Kagenti operator
+### 4. Install Kagenti operator (cluster-admin only)
+
+Skip this step if the operator is already installed or if the user doesn't have cluster-admin (step 1 verified prerequisites).
 
 The operator Helm chart is published as an OCI artifact from [kagenti-operator](https://github.com/kagenti/kagenti-operator) CI to `ghcr.io/kagenti/kagenti-operator/`. Check [GitHub releases](https://github.com/kagenti/kagenti-operator/releases) for the latest version.
 
@@ -71,7 +102,9 @@ Note: The `DOCKER_CONFIG` workaround avoids `docker-credential-desktop` errors o
 
 Wait: `kubectl wait --for=condition=available deployment/kagenti-controller-manager -n kagenti-system --timeout=120s`
 
-### 5. Install CRDs
+### 5. Install CRDs (cluster-admin only)
+
+Skip if already present (step 1 verified).
 
 Check for BOTH required CRDs:
 ```bash
@@ -86,7 +119,9 @@ The `agentruntimes` CRD is NOT in the Helm chart yet — install it manually if 
 kubectl apply -f https://raw.githubusercontent.com/kagenti/kagenti-operator/main/kagenti-operator/config/crd/bases/agent.kagenti.dev_agentruntimes.yaml
 ```
 
-### 6. Install kagenti-extensions webhook
+### 6. Install kagenti-extensions webhook (cluster-admin only)
+
+Skip if already present (step 1 verified).
 
 Check: `kubectl get ns kagenti-webhook-system`
 
@@ -97,7 +132,9 @@ kubectl apply -f manifests/webhook/webhook-all.yaml
 
 Wait: `kubectl wait --for=condition=available deployment/kagenti-webhook-controller-manager -n kagenti-webhook-system --timeout=120s`
 
-### 7. Create and label namespace
+### 7. Create and label namespace (cluster-admin only)
+
+Skip if namespace already exists and is labeled (step 1 verified).
 
 ```bash
 kubectl create ns <NAMESPACE> 2>/dev/null || true
