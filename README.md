@@ -30,6 +30,8 @@ Using Claude Code? Even simpler:
 /deploy-openclaw
 ```
 
+The skill walks through everything — operator, webhook, manifests, API keys, tracing, pairing. It asks for input only when it can't automate (e.g., your Anthropic API key if no Secret exists).
+
 ## What Gets Deployed
 
 ```
@@ -61,6 +63,7 @@ Three Kagenti primitives manage the agent's lifecycle:
 | **AgentRuntime** | Attaches to an existing Deployment or StatefulSet. Applies labels, config hashes, and tracks pod readiness. The agent code is untouched. |
 | **AgentCard** | Discovers agent metadata via the A2A protocol. Supports HTTP fetch or ConfigMap-based injection for agents that don't natively serve `/.well-known/agent-card.json`. |
 | **ConfigMap (agent card)** | A static A2A agent card injected as `{agentName}-card-signed`. The Kagenti `ConfigMapFetcher` reads this before trying HTTP. No sidecar or image rebuild needed. |
+| **Webhook** | The [kagenti-extensions](https://github.com/kagenti/kagenti-extensions) admission webhook intercepts Pod CREATE events and injects sidecars (SPIFFE, Envoy), env vars (OTEL), and volumes based on the AgentRuntime CR spec. Requires `kagenti-enabled=true` label on the namespace. |
 
 ## After Deployment
 
@@ -118,25 +121,11 @@ data:
 
 Apply it, and the AgentCard CR syncs automatically. This pattern works for any non-A2A agent.
 
-## The Platform Layers (from the blog)
-
-This repo covers the deployment and discovery layer. The [blog series](https://www.redhat.com/en/blog/operationalizing-bring-your-own-agent-red-hat-ai-openclaw-edition) covers the full stack:
-
-| Layer | What it provides | Status |
-|-------|-----------------|--------|
-| **Isolation** | Sandboxed containers (Kata) for kernel-isolated agent sessions | Planned |
-| **Identity** | SPIFFE/SPIRE workload identity, scoped service-account tokens | Planned (Kagenti) |
-| **Lifecycle** | AgentRuntime + AgentCard CRDs for deploy, discover, observe | This repo |
-| **Observability** | MLflow tracing (OTEL-compatible) for prompts, tool calls, token costs | Developer preview |
-| **Safety** | Garak adversarial scanning, Guardrails Orchestrator, NeMo Guardrails | GA / Tech preview |
-| **Tool governance** | MCP Gateway (Envoy-based) with identity-based tool filtering | Developer preview |
-| **API surface** | OpenResponses-compatible runtime, vLLM chat completions | Available |
-
 ## Configuration
 
 | Variable | Default | What it does |
 |----------|---------|-------------|
-| `NAMESPACE` | `agents` | Where OpenClaw lands |
+| `NAMESPACE` | `openclaw` | Where OpenClaw lands (the skill asks you to choose) |
 | `IMAGE` | `quay.io/aicatalyst/openclaw:latest` | The agent image |
 | `KAGENTI_VERSION` | `0.2.0-alpha.22` | Kagenti operator chart version |
 
@@ -154,12 +143,9 @@ make deploy NAMESPACE=my-agents IMAGE=quay.io/aicatalyst/openclaw:20260320-d0ed2
 | `make status` | Show pod, AgentRuntime, and AgentCard status |
 | `make approve-pairing` | Approve pending dashboard device pairings |
 
-## Claude Code Skills
+## Claude Code Skill
 
-| Skill | What it does |
-|-------|-------------|
-| `/deploy-openclaw` | Full automated deployment: operator, manifests, route, token, pairing |
-| `/setup-agentcard` | Generate and deploy an A2A agent card ConfigMap for any agent |
+Run `/deploy-openclaw` for full automated deployment: operator, webhook, CRDs, RBAC, namespace setup, manifests, API keys, A2A agent card, OTEL tracing, route, token, and device pairing.
 
 ## Connecting to the Dashboard
 
@@ -167,30 +153,57 @@ After `make deploy`, open the printed dashboard URL. Paste the gateway token, cl
 
 ## Prerequisites
 
+**Required:**
 - A Kubernetes cluster (v1.28+) — OpenShift for Route support, or bring your own Ingress
-- `kubectl` configured and connected
-- `helm` v4+ (the Makefile installs the Kagenti operator for you)
+- `kubectl` configured and connected to the cluster
+- `helm` v4+ installed locally (Helm v3.x does not support OCI charts)
+- An **Anthropic API key** — the `/deploy-openclaw` skill will ask for it and create a Secret. If you already have a Secret named `llm-keys` with an `anthropic` key in the `agents` namespace, it will be used automatically
 
-## Gotchas
+**Optional (for full observability):**
+- **MLflow** deployed on the cluster — the OTEL preload script sends traces to MLflow. If MLflow is not present, OpenClaw still works but without tracing. MLflow's `--allowed-hosts` must include the service hostname with port (e.g., `mlflow-service.test.svc.cluster.local:5000`)
 
-Things we hit deploying OpenClaw on Kagenti. Read these before filing bugs.
+**Assumptions the skill handles for you:**
+- Asks you to choose a namespace (default: `openclaw`) — does not reuse existing namespaces with other workloads
+- Detects stale resources from previous deployments and offers cleanup
+- Creates the namespace and labels it with `kagenti-enabled=true` for the webhook
+- Installs the Kagenti operator via Helm if not present
+- Installs the AgentRuntime CRD if not in the cluster
+- Deploys the webhook from bundled manifests (no Helm or clone needed)
+- Detects MLflow on the cluster and configures OTEL tracing automatically (or skips if not found)
+- Configures `AgentRuntime.spec.trace` dynamically based on detected MLflow endpoint
+- Creates the OTEL preload ConfigMap and A2A agent card ConfigMap
+- Asks you to create the API key Secret yourself (never asks for the key directly) and verifies it exists before continuing
+- Patches the Deployment with the API key reference and OTEL env vars
+- Retrieves the gateway token and approves device pairing
 
-**Application concerns (agent-side)**
+## FYI: Gotchas
 
-- **OpenClaw binds to loopback by default.** It listens on `127.0.0.1:18789`, not `0.0.0.0`. The Kubernetes Service can't reach it. The init container runs `openclaw config set gateway.bind lan` to fix this. Any agent you deploy must listen on `0.0.0.0` on its declared port — this is the agent's responsibility, not the platform's.
-- **OpenClaw uses port 18789, not 8000.** The gateway WebSocket port is non-standard. The Service and Route must target 18789.
-- **Gateway token regenerates on every pod restart.** OpenClaw stores its auth token in the ephemeral `emptyDir` volume. New pod = new token. Run `make token` after restarts.
-- **Device pairing required after every reconnect.** The Control UI requires device pairing approval. Run `make approve-pairing` after connecting.
-- **Browser automation fails — no Chrome in the image.** The `quay.io/aicatalyst/openclaw:latest` image doesn't ship Chromium. Browser tool calls return "can't use browser automation in this environment."
-- **Env var refusal is the LLM, not the platform.** When asked "show me your env vars," GPT-4o refuses for "privacy reasons." This is model-level safety behavior, not platform enforcement. The tools are available — the model chooses not to use them.
+Things we hit deploying OpenClaw on Kagenti. The `/deploy-openclaw` skill handles all of them automatically — these are documented for understanding, not for manual steps.
 
-**Platform concerns (Kagenti-side)**
+- [**Application gotchas**](docs/gotchas-application.md) — OpenClaw-specific: loopback binding, non-standard port, token regeneration, device pairing, missing Chrome
+- [**Platform gotchas**](docs/gotchas-platform.md) — Kagenti-specific: namespace labels, AgentCard sync, trace injection gaps, MLflow DNS rebinding, OTEL instrumentation level
 
-- **Namespace needs `kagenti-enabled=true` label.** The webhook's `namespaceSelector` requires this label. Without it, the webhook is never called and injection silently doesn't happen. `kubectl label namespace agents kagenti-enabled=true`
-- **AgentCard shows `SYNCED=False` for non-A2A agents.** OpenClaw doesn't serve `/.well-known/agent-card.json`. Create a ConfigMap named `{serviceName}-card-signed` with key `agent-card.json` to provide the agent card data. The operator's `ConfigMapFetcher` reads it before trying HTTP.
-- **AgentRuntime `spec.trace` doesn't inject env vars.** The operator includes it in the config hash (triggering a rollout) but doesn't set `OTEL_EXPORTER_OTLP_ENDPOINT` on the pod. The webhook has the plumbing (`ResolvedConfig.TraceEndpoint`) but doesn't emit env vars yet.
-- **MLflow OTLP endpoint rejects requests with port in Host header.** The OTEL SDK sends `Host: mlflow-service.test.svc.cluster.local:5000`. MLflow's `--allowed-hosts` must include the `:5000` variant or it rejects with "DNS rebinding attack detected."
-- **OTEL traces are HTTP-level, not GenAI-level.** Without application-level instrumentation, traces show URL/status/latency but not prompts, completions, or token counts. The agent needs to emit GenAI semantic convention spans for full observability.
+## AgentRuntime Controller
+
+The AgentRuntime CRD and controller were added in [`kagenti-operator#218`](https://github.com/kagenti/kagenti-operator/pull/218) (merged to main, commit [`019ef44`](https://github.com/kagenti/kagenti-operator/commit/019ef44)). The CRD is not yet included in the Helm chart — it must be installed manually from the repo:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kagenti/kagenti-operator/main/kagenti-operator/config/crd/bases/agent.kagenti.dev_agentruntimes.yaml
+```
+
+## Webhook Changes (not yet upstream)
+
+The released webhook image (`ghcr.io/kagenti/kagenti-extensions/kagenti-webhook:0.4.0-alpha.9`) reads `spec.trace` from the AgentRuntime CR but doesn't inject OTEL env vars into the agent container. We patched three files in [kagenti-extensions](https://github.com/kagenti/kagenti-extensions) to close this gap:
+
+| File | Change |
+|------|--------|
+| `container_builder.go` | Added `BuildTraceEnv()` — converts `ResolvedConfig.TraceEndpoint/Protocol/SamplingRate` into `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` env vars |
+| `pod_mutator.go` | Calls `BuildTraceEnv()` and injects env vars into `podSpec.Containers[0]` via `appendEnvVarsIfAbsent()`. Also fixes early return when all sidecars are disabled (trace injection still needed) and resolves Deployment name from ReplicaSet name by stripping `pod-template-hash` |
+| `container_builder_test.go` | 4 tests covering: endpoint+protocol+rate, no endpoint, endpoint-only, and `appendEnvVarsIfAbsent` preserving existing values |
+
+The changes are in a fork: [`zanetworker/kagenti-extensions@0048067`](https://github.com/zanetworker/kagenti-extensions/commit/0048067) on the [`feat/trace-env-injection`](https://github.com/zanetworker/kagenti-extensions/tree/feat/trace-env-injection) branch.
+
+The patched image is at `quay.io/azaalouk/kagenti-webhook:trace-injection`. To use the upstream image instead, you lose OTEL env var injection from `spec.trace` — the OTEL preload script in `manifests/otel-tracing-configmap.yaml` still works independently.
 
 ## Related Projects
 

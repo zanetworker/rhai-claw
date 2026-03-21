@@ -35,13 +35,6 @@ spec:
         image: quay.io/aicatalyst/openclaw:latest
         ports:
         - containerPort: 18789
-        env:
-        - name: NODE_OPTIONS
-          value: "--require /otel/otel-setup.js"
-        - name: OTEL_EXPORTER_OTLP_ENDPOINT
-          value: "http://mlflow-service.test.svc.cluster.local:5000"
-        - name: OTEL_SERVICE_NAME
-          value: "openclaw"
         volumeMounts:
         - name: openclaw-data
           mountPath: /home/node/.openclaw

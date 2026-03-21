@@ -8,8 +8,3 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: openclaw
-  trace:
-    endpoint: "http://mlflow-service.test.svc.cluster.local:5000"
-    protocol: http
-    sampling:
-      rate: 1.0

@@ -1,0 +1,393 @@
+---
+# Source: kagenti-webhook-chart/templates/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kagenti-webhook-system
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: kagenti-webhook-chart/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kagenti-webhook
+  namespace: kagenti-webhook-system
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: kagenti-webhook-chart/templates/configmap-feature-gates.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kagenti-webhook-feature-gates
+  namespace: kagenti-webhook-system
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: feature-gates
+data:
+  feature-gates.yaml: |
+    clientRegistration: false
+    envoyProxy: false
+    globalEnabled: true
+    injectTools: false
+    perWorkloadConfigResolution: true
+    spiffeHelper: false
+---
+# Source: kagenti-webhook-chart/templates/configmap-platform-defaults.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kagenti-webhook-defaults
+  namespace: kagenti-webhook-system
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: platform-defaults
+data:
+  config.yaml: |
+    images:
+      clientRegistration: ghcr.io/kagenti/kagenti-extensions/client-registration:latest
+      envoyProxy: ghcr.io/kagenti/kagenti-extensions/envoy-with-processor:latest
+      proxyInit: ghcr.io/kagenti/kagenti-extensions/proxy-init:latest
+      pullPolicy: IfNotPresent
+      spiffeHelper: ghcr.io/spiffe/spiffe-helper:0.11.0
+    proxy:
+      adminPort: 9901
+      inboundProxyPort: 15124
+      port: 15123
+      uid: 1337
+    resources:
+      clientRegistration:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+      envoyProxy:
+        limits:
+          cpu: 200m
+          memory: 256Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+      proxyInit:
+        limits:
+          cpu: 10m
+          memory: 10Mi
+        requests:
+          cpu: 10m
+          memory: 10Mi
+      spiffeHelper:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+    sidecars:
+      clientRegistration:
+        enabled: true
+      envoyProxy:
+        enabled: true
+      spiffeHelper:
+        enabled: true
+---
+# Source: kagenti-webhook-chart/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kagenti-webhook-manager-role
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["get", "create", "update"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get", "list", "watch"]
+---
+# Source: kagenti-webhook-chart/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kagenti-webhook-manager-rolebinding
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kagenti-webhook-manager-role
+subjects:
+- kind: ServiceAccount
+  name: kagenti-webhook
+  namespace: kagenti-webhook-system
+---
+# Source: kagenti-webhook-chart/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: kagenti-webhook-webhook-service
+  namespace: kagenti-webhook-system
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - port: 443
+    targetPort: 9443
+    protocol: TCP
+    name: webhook
+  selector:
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    control-plane: controller-manager
+---
+# Source: kagenti-webhook-chart/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kagenti-webhook-controller-manager
+  namespace: kagenti-webhook-system
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+    control-plane: controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kagenti-webhook-chart
+      app.kubernetes.io/instance: kagenti-webhook
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        app.kubernetes.io/name: kagenti-webhook-chart
+        app.kubernetes.io/instance: kagenti-webhook
+        control-plane: controller-manager
+    spec:
+      serviceAccountName: kagenti-webhook
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: manager
+        image: "quay.io/azaalouk/kagenti-webhook:trace-injection"
+        imagePullPolicy: Always
+        args:
+        - --metrics-bind-address=:8443
+        - --health-probe-bind-address=:8081
+        - --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
+        - --enable-client-registration=true
+        - --config-path=/etc/kagenti/config.yaml
+        - --feature-gates-path=/etc/kagenti/feature-gates/feature-gates.yaml
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: webhook-certs
+          readOnly: true
+        - name: platform-config
+          mountPath: /etc/kagenti
+          readOnly: true
+        - name: feature-gates
+          mountPath: /etc/kagenti/feature-gates
+          readOnly: true
+      volumes:
+      - name: webhook-certs
+        secret:
+          secretName: kagenti-webhook-webhook-server-cert
+      - name: platform-config
+        configMap:
+          name: kagenti-webhook-defaults
+      - name: feature-gates
+        configMap:
+          name: kagenti-webhook-feature-gates
+      terminationGracePeriodSeconds: 10
+---
+# Source: kagenti-webhook-chart/templates/authbridge-mutatingwebhook.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: kagenti-webhook-authbridge-mutating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: kagenti-webhook-system/kagenti-webhook-serving-cert
+webhooks:
+- name: inject.kagenti.io
+  admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: kagenti-webhook-webhook-service
+      namespace: kagenti-webhook-system
+      path: /mutate-workloads-authbridge
+  failurePolicy: Fail
+  reinvocationPolicy: IfNeeded
+  timeoutSeconds: 10
+  sideEffects: None
+  namespaceSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: NotIn
+        values:
+          - kube-system
+          - kube-public
+          - kube-node-lease
+          - kagenti-webhook-system
+    matchLabels:
+      # Only trigger webhook for namespaces that have opted-in
+      # This aligns with the precedence evaluator Layer 3 which requires kagenti-enabled: true
+      kagenti-enabled: "true"
+  objectSelector:
+    matchExpressions:
+      - key: kagenti.io/type
+        operator: In
+        values:
+          - agent
+          - tool
+      - key: kagenti.io/inject
+        operator: NotIn
+        values:
+          - disabled
+  rules:
+  - operations:
+    - CREATE
+    apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    resources:
+    - pods
+---
+# Source: kagenti-webhook-chart/templates/certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kagenti-webhook-serving-cert
+  namespace: kagenti-webhook-system
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  dnsNames:
+  - kagenti-webhook-webhook-service.kagenti-webhook-system.svc
+  - kagenti-webhook-webhook-service.kagenti-webhook-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: kagenti-webhook-selfsigned-issuer
+  secretName: kagenti-webhook-webhook-server-cert
+---
+# Source: kagenti-webhook-chart/templates/certificate-issuer.yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: kagenti-webhook-selfsigned-issuer
+  namespace: kagenti-webhook-system
+  labels:
+    helm.sh/chart: kagenti-webhook-chart-0.1.0
+    app.kubernetes.io/name: kagenti-webhook-chart
+    app.kubernetes.io/instance: kagenti-webhook
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selfSigned: {}
+---
+# RBAC for webhook to read AgentRuntime CRs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kagenti-webhook-agentruntime-reader
+rules:
+- apiGroups: ["agent.kagenti.dev"]
+  resources: ["agentruntimes"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kagenti-webhook-agentruntime-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kagenti-webhook-agentruntime-reader
+subjects:
+- kind: ServiceAccount
+  name: kagenti-webhook
+  namespace: kagenti-webhook-system
