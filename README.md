@@ -1,16 +1,25 @@
 # kagenti-claw
 
-**Bring Your Own Agent. We bring the platform.**
+**No matter where your agent comes from, the platform is your agent's safe haven.**
 
-The AI agent world is messy. Teams reach for LangChain, CrewAI, AutoGen, or build from scratch. Good. That's the creative phase. But once an agent leaves a developer's laptop and starts talking to production data, calling external APIs, or running on shared infrastructure, freedom without guardrails stops being a feature and starts being a liability.
+OpenClaw, ZeroClaw, a custom LangGraph agent, a CrewAI crew, something you built last weekend with Claude Code — the platform doesn't care. You build the agent. The platform brings identity, observability, tool governance, and lifecycle management. Your agent's code stays untouched.
 
-This repo is the companion to [Operationalizing "Bring Your Own Agent" on Red Hat AI, the OpenClaw edition](https://www.redhat.com/en/blog/operationalizing-bring-your-own-agent-red-hat-ai-openclaw-edition). It takes [OpenClaw](https://github.com/openclaw/openclaw), a personal AI assistant that routes agent interactions across channels (WhatsApp, Telegram, Slack, Discord) through a central WebSocket gateway, and operationalizes it on Kubernetes with [Kagenti](https://github.com/kagenti/kagenti-operator).
-
-We aren't wrapping OpenClaw in a proprietary framework. We're wrapping it in platform infrastructure.
+This repo is the companion to [Operationalizing "Bring Your Own Agent" on Red Hat AI, the OpenClaw edition](https://www.redhat.com/en/blog/operationalizing-bring-your-own-agent-red-hat-ai-openclaw-edition). It takes [OpenClaw](https://github.com/openclaw/openclaw) — a personal AI assistant that routes agent interactions across channels (WhatsApp, Telegram, Slack, Discord) — and operationalizes it on Kubernetes with [Kagenti](https://github.com/kagenti/kagenti-operator). OpenClaw is the example. The pattern works for any agent runtime.
 
 ## The BYOA Principle
 
-The platform is framework-agnostic. What matters is that the agent has identity, runs under least-privilege, gets observed, passes safety checks, and can be audited after the fact. The platform provides security, governance, observability, and lifecycle management. The agent stays yours.
+One agent, one pod. The developer deploys a standard container. The platform wraps it in infrastructure.
+
+| You bring | The platform adds |
+|-----------|-------------------|
+| Your agent container (any framework, any runtime) | **Discovery** — AgentCard CR auto-indexes your agent via A2A |
+| Your LLM provider keys | **Observability** — OTEL traces to MLflow for every LLM call |
+| Your tools and MCP servers | **Identity** — SPIFFE/SPIRE workload identity (planned) |
+| | **Tool governance** — MCP Gateway with identity-based filtering (planned) |
+| | **Safety** — Guardrails Orchestrator at the inference boundary (planned) |
+| | **Lifecycle** — AgentRuntime CR manages labels, config, rolling updates |
+
+The platform is framework-agnostic. It doesn't ask you to rewrite your agent or adopt a specific SDK. It wraps your workload in enterprise infrastructure — the same way OpenShift wraps any container in networking, storage, and security without modifying the application.
 
 OpenClaw doesn't sandbox by default. It doesn't enforce RBAC, trace tool calls, or gate access to external services. Kagenti and Red Hat AI add each of those layers without touching the agent's code.
 
