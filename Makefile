@@ -1,4 +1,4 @@
-NAMESPACE ?= agents
+NAMESPACE ?= openclaw
 IMAGE ?= quay.io/aicatalyst/openclaw:latest
 KAGENTI_VERSION ?= 0.2.0-alpha.22
 HELM ?= helm

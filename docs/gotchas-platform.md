@@ -61,3 +61,25 @@ kubectl apply -f https://raw.githubusercontent.com/kagenti/kagenti-operator/main
 ```
 
 The operator binary in the Helm chart also doesn't include the AgentRuntime controller code yet — the controller reconciles but the released image predates PR #218.
+
+## CRDs get stuck terminating after deletion
+
+Deleting a CRD while CRs still exist causes the CRD to hang in `Terminating` state with finalizers. On the next install, `kubectl apply` fails with "create not allowed while custom resource definition is terminating." The fix is to patch out the finalizers:
+
+```bash
+kubectl patch crd agentruntimes.agent.kagenti.dev --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]'
+```
+
+The skill checks for terminating CRDs in the stale resource detection step and clears them automatically.
+
+## AgentCards CRD comes from the Helm chart only
+
+The `agentcards.agent.kagenti.dev` CRD is installed by the Kagenti operator Helm chart at first install. Helm does not recreate CRDs on subsequent installs. If the CRD is manually deleted, you must uninstall and reinstall the operator (`helm uninstall` then `helm install`) to get it back.
+
+## Empty secrets cause silent failures
+
+Creating a secret with `kubectl create secret --from-literal=anthropic=$ANTHROPIC_API_KEY` when `$ANTHROPIC_API_KEY` is unset in the shell creates a secret with an empty value. The secret exists (passes `kubectl get secret` checks) but OpenClaw reports "No API key found." The skill now verifies the secret has non-empty content by checking the base64-encoded value length.
+
+## Secrets are namespace-scoped
+
+A secret created in the `agents` namespace is not visible in the `openclaw` namespace. The skill emphasizes the target namespace in every secret creation command. This caused a `CreateContainerConfigError` during testing when the secret was in the wrong namespace.

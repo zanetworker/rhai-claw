@@ -70,13 +70,13 @@ Three Kagenti primitives manage the agent's lifecycle:
 Your cluster has a fully managed, discoverable AI agent:
 
 ```
-$ kubectl get agentruntimes -n agents
+$ kubectl get agentruntimes -n openclaw
 NAME       TYPE    TARGET     PHASE    AGE
 openclaw   agent   openclaw   Active   2m
 ```
 
 ```
-$ kubectl get agentcards -n agents
+$ kubectl get agentcards -n openclaw
 NAME                       PROTOCOL   KIND         TARGET     VERIFIED   BOUND   SYNCED   AGE
 openclaw-deployment-card   a2a        Deployment   openclaw                      True     2m
 ```
@@ -100,7 +100,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: openclaw-card-signed    # Must be {serviceName}-card-signed
-  namespace: agents
+  namespace: openclaw
 data:
   agent-card.json: |
     {
