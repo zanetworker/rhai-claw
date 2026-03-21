@@ -4,9 +4,8 @@ metadata:
   name: openclaw-otel-tracing
 data:
   otel-setup.js: |
-    // OTEL auto-setup for OpenClaw → MLflow tracing
-    // Loaded via NODE_OPTIONS="--require /otel/otel-setup.js"
-    // Resolves modules from /app/node_modules where OpenClaw's deps live
+    // OTEL tracing for OpenClaw → MLflow
+    // Patches globalThis.fetch to create spans for outgoing LLM API calls
     const Module = require("module");
     const origResolve = Module._resolveFilename;
     Module._resolveFilename = function(request, parent, isMain, options) {
@@ -25,7 +24,9 @@ data:
       const { NodeSDK } = require("@opentelemetry/sdk-node");
       const { OTLPTraceExporter } = require("@opentelemetry/exporter-trace-otlp-proto");
       const { resourceFromAttributes } = require("@opentelemetry/resources");
+      const api = require("@opentelemetry/api");
 
+      const experimentId = process.env.MLFLOW_EXPERIMENT_ID || "0";
       const sdk = new NodeSDK({
         resource: resourceFromAttributes({
           "service.name": process.env.OTEL_SERVICE_NAME || "openclaw",
@@ -33,11 +34,56 @@ data:
         }),
         traceExporter: new OTLPTraceExporter({
           url: endpoint + "/v1/traces",
+          headers: { "x-mlflow-experiment-id": experimentId },
         }),
       });
-
       sdk.start();
-      console.log("[otel-setup] OTEL tracing started -> " + endpoint);
+
+      // Patch globalThis.fetch to create spans for LLM API calls
+      // The Anthropic SDK (and most modern Node.js SDKs) use fetch, not http.request
+      const tracer = api.trace.getTracer("openclaw-llm", "1.0.0");
+      const origFetch = globalThis.fetch;
+
+      globalThis.fetch = async function(input, init) {
+        const url = typeof input === "string" ? input : input.url || String(input);
+        let host;
+        try { host = new URL(url).hostname; } catch { host = "unknown"; }
+
+        const isLLMCall = host.includes("anthropic") || host.includes("openai") ||
+                          host.includes("together") || host.includes("openrouter") ||
+                          host.includes("ollama") || host.includes("vllm") ||
+                          host.includes("inference");
+
+        if (!isLLMCall) return origFetch.apply(this, arguments);
+
+        const method = (init && init.method) || "POST";
+        const span = tracer.startSpan("llm.call " + host, {
+          attributes: {
+            "http.method": method,
+            "http.url": url,
+            "server.address": host,
+            "gen_ai.system": host.includes("anthropic") ? "anthropic" :
+                             host.includes("openai") ? "openai" : "other",
+          },
+        });
+
+        try {
+          const res = await api.context.with(
+            api.trace.setSpan(api.context.active(), span),
+            () => origFetch.apply(this, arguments)
+          );
+          span.setAttribute("http.response.status_code", res.status);
+          span.end();
+          return res;
+        } catch (err) {
+          span.setAttribute("error.type", err.name || "Error");
+          span.setAttribute("error.message", err.message);
+          span.end();
+          throw err;
+        }
+      };
+
+      console.log("[otel-setup] OTEL tracing started -> " + endpoint + " (fetch instrumentation)");
 
       process.on("SIGTERM", () => sdk.shutdown());
       process.on("SIGINT", () => sdk.shutdown());

@@ -171,6 +171,27 @@ After `make deploy`, open the printed dashboard URL. Paste the gateway token, cl
 - `kubectl` configured and connected
 - `helm` v4+ (the Makefile installs the Kagenti operator for you)
 
+## Gotchas
+
+Things we hit deploying OpenClaw on Kagenti. Read these before filing bugs.
+
+**Application concerns (agent-side)**
+
+- **OpenClaw binds to loopback by default.** It listens on `127.0.0.1:18789`, not `0.0.0.0`. The Kubernetes Service can't reach it. The init container runs `openclaw config set gateway.bind lan` to fix this. Any agent you deploy must listen on `0.0.0.0` on its declared port — this is the agent's responsibility, not the platform's.
+- **OpenClaw uses port 18789, not 8000.** The gateway WebSocket port is non-standard. The Service and Route must target 18789.
+- **Gateway token regenerates on every pod restart.** OpenClaw stores its auth token in the ephemeral `emptyDir` volume. New pod = new token. Run `make token` after restarts.
+- **Device pairing required after every reconnect.** The Control UI requires device pairing approval. Run `make approve-pairing` after connecting.
+- **Browser automation fails — no Chrome in the image.** The `quay.io/aicatalyst/openclaw:latest` image doesn't ship Chromium. Browser tool calls return "can't use browser automation in this environment."
+- **Env var refusal is the LLM, not the platform.** When asked "show me your env vars," GPT-4o refuses for "privacy reasons." This is model-level safety behavior, not platform enforcement. The tools are available — the model chooses not to use them.
+
+**Platform concerns (Kagenti-side)**
+
+- **Namespace needs `kagenti-enabled=true` label.** The webhook's `namespaceSelector` requires this label. Without it, the webhook is never called and injection silently doesn't happen. `kubectl label namespace agents kagenti-enabled=true`
+- **AgentCard shows `SYNCED=False` for non-A2A agents.** OpenClaw doesn't serve `/.well-known/agent-card.json`. Create a ConfigMap named `{serviceName}-card-signed` with key `agent-card.json` to provide the agent card data. The operator's `ConfigMapFetcher` reads it before trying HTTP.
+- **AgentRuntime `spec.trace` doesn't inject env vars.** The operator includes it in the config hash (triggering a rollout) but doesn't set `OTEL_EXPORTER_OTLP_ENDPOINT` on the pod. The webhook has the plumbing (`ResolvedConfig.TraceEndpoint`) but doesn't emit env vars yet.
+- **MLflow OTLP endpoint rejects requests with port in Host header.** The OTEL SDK sends `Host: mlflow-service.test.svc.cluster.local:5000`. MLflow's `--allowed-hosts` must include the `:5000` variant or it rejects with "DNS rebinding attack detected."
+- **OTEL traces are HTTP-level, not GenAI-level.** Without application-level instrumentation, traces show URL/status/latency but not prompts, completions, or token counts. The agent needs to emit GenAI semantic convention spans for full observability.
+
 ## Related Projects
 
 - [**Kagenti Operator**](https://github.com/kagenti/kagenti-operator) — Agent lifecycle management, discovery, and identity for Kubernetes
