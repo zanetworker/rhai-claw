@@ -8,7 +8,10 @@ data:
     models:
       - type: main
         engine: openai
-        model: gpt-4o-mini
+        model: llama3-2-8b
+        parameters:
+          openai_api_base: https://llama3-2-8b-test.apps.cluster-nrpwk.nrpwk.sandbox2474.opentlc.com/v1
+          openai_api_key: none
 
     rails:
       input:

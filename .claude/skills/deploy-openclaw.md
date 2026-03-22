@@ -318,6 +318,39 @@ kubectl patch deploy openclaw -n <NAMESPACE> --type=json -p '[
 ]'
 ```
 
+### 13b. Detect self-hosted models (Llama Stack / vLLM)
+
+Check if the cluster has self-hosted models that could be used for guardrail evaluation instead of external APIs:
+
+```bash
+kubectl get inferenceservice -A 2>/dev/null
+kubectl get llamastackdistributions -A 2>/dev/null
+```
+
+If InferenceServices are found, get the model details:
+```bash
+# Get the route and model ID
+ISVC_ROUTE=$(kubectl get inferenceservice -A -o jsonpath='{.items[0].status.url}' 2>/dev/null)
+if [ -n "$ISVC_ROUTE" ]; then
+  curl -sk "$ISVC_ROUTE/v1/models" | python3 -c "import sys,json; d=json.load(sys.stdin)['data'][0]; print(f'Model: {d[\"id\"]}, Route: sys.argv[1]')" "$ISVC_ROUTE" 2>/dev/null
+fi
+```
+
+If a self-hosted model is found, ask the user:
+
+> "Found self-hosted model `<MODEL_ID>` at `<ROUTE>`. You can use this for guardrail safety checks instead of OpenAI API (zero external API calls).
+>
+> **Warning:** Models smaller than 8B parameters (e.g., Llama 3.2 3B) are too small for reliable safety evaluation — the guardrails will silently fail to block harmful content. Use 8B+ general models or specialized safety models (Granite Guardian, Llama Guard).
+>
+> Options:
+> 1. **Use self-hosted model** — fully on-cluster, no API keys needed
+> 2. **Use OpenAI API** — GPT-4o-mini, reliable but requires API key + external calls
+> 3. **Skip guardrails** — deploy OpenClaw without safety rails"
+
+If the user chooses the self-hosted model, set `GUARDRAILS_ENGINE=openai`, `GUARDRAILS_MODEL=<MODEL_ID>`, `GUARDRAILS_API_BASE=<ROUTE>/v1`, `GUARDRAILS_API_KEY=none`.
+
+If the user chooses OpenAI, set `GUARDRAILS_ENGINE=openai`, `GUARDRAILS_MODEL=gpt-4o-mini`, `GUARDRAILS_API_BASE=` (empty, uses default OpenAI URL), `GUARDRAILS_API_KEY=${OPENAI_API_KEY}`.
+
 ### 14. Deploy NeMo Guardrails via TrustyAI operator
 
 Deploy guardrails using the product stack — the TrustyAI `NemoGuardrails` CRD manages the NeMo pod lifecycle.

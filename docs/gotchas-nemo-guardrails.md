@@ -155,6 +155,39 @@ This is a hidden dependency chain: NeMo → LangChain → provider-specific Lang
 
 **Workaround:** Use `engine: openai` with GPT-4o-mini (works with the RHOAI image). Or `engine: openai` pointed at any OpenAI-compatible endpoint (vLLM, Llama Stack, LiteLLM).
 
+### 9. Small models (3B) can't reliably evaluate safety rails :warning:
+
+**Priority rank: NEW**
+
+**Symptom:** All responses are generic ("Hello! How can I assist you today?") regardless of what the user asks. Blocked requests are not blocked — they also return the generic greeting. The self-check rails don't work.
+
+**Root cause:** NeMo Guardrails' self-check rails rely on the LLM being able to:
+1. Read a policy prompt describing what's allowed and what's blocked
+2. Evaluate the user's message against that policy
+3. Answer exactly "Yes" (block) or "No" (allow)
+
+A 3B parameter model (Llama 3.2 3B Instruct) is too small to do this reliably. It ignores the structured prompt and defaults to generic responses. The self-check input rail returns "No" (don't block) for everything because the model can't follow the instructions.
+
+**What we tested:**
+
+| Model | Self-check accuracy | Response quality | Verdict |
+|-------|-------------------|-----------------|---------|
+| GPT-4o-mini (OpenAI) | Correct — blocks env vars, profanity, exfiltration | Good — real answers to allowed questions | Works |
+| Claude Sonnet (Anthropic) | Correct | Excellent | Works (needs `langchain-anthropic`) |
+| Llama 3.2 3B (self-hosted vLLM) | Broken — blocks nothing, generic responses | Poor — "Hello! How can I assist you today?" for everything | Too small |
+
+**Minimum model size for guardrail evaluation:**
+
+| Use case | Minimum model | Recommended |
+|----------|--------------|-------------|
+| Self-check input/output rails | 8B+ general model | GPT-4o-mini, Llama 3.1 8B Instruct |
+| Content safety classification | Specialized safety model (any size) | Granite Guardian 8B, Llama Guard 3 8B |
+| Full conversational rails (Colang flows + generation) | 8B+ with instruction following | Llama 3.1 70B, GPT-4o, Claude Sonnet |
+
+**Workaround:** Use a model with at least 8B parameters, or a purpose-built safety model. For self-hosted: serve an 8B+ model on vLLM. For external: GPT-4o-mini is cheap and works well.
+
+**What to know:** The 3B model technically runs — NeMo doesn't error. It just silently produces wrong answers for the safety checks. No warning, no fallback. If you point NeMo at a weak model, your guardrails are theater.
+
 ### 8. NeMo Guardrails only accepts OpenAI format — can't guard Anthropic Messages API traffic :no_entry:
 
 **Priority rank: NEW**

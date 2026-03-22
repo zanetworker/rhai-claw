@@ -30,6 +30,9 @@ The top gotchas across all teams, ranked by how likely they are to block you and
 | 12 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [Self-check prompt flags agent metadata as attacks](gotchas-nemo-guardrails.md#5-self-check-prompt-too-sensitive-to-agent-metadata-warning) | 30 min — false positives on every message |
 | 36 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [NeMo depends on LangChain for LLM access — provider lock-in](gotchas-nemo-guardrails.md#7-nemo-guardrails-depends-on-langchain-for-llm-access-warning) | Limits which models can evaluate safety. Explore Llama Stack alternative. |
 | 37 | :no_entry: | [TrustyAI / NeMo](#trustyai--safety-team) | [NeMo only accepts OpenAI format — can't guard Anthropic Messages API traffic](gotchas-nemo-guardrails.md#8-nemo-guardrails-only-accepts-openai-format--cant-guard-anthropic-messages-api-traffic-no_entry) | Agents using Anthropic directly bypass guardrails entirely |
+| 38 | :warning: | [Llama Stack / Inference](#llama-stack--inference-team) | [3B model silently breaks safety rails — guardrails are theater](gotchas-llama-stack.md#1-3b-model-silently-breaks-safety-rails--no-errors-no-warnings-warning) | No errors, no warnings, rails just don't work |
+| 39 | :warning: | [Llama Stack / Inference](#llama-stack--inference-team) | [KServe headless service not reachable cross-namespace](gotchas-llama-stack.md#2-kserve-headless-service-not-reachable-from-other-namespaces-warning) | Must use Route instead of internal service |
+| 40 | :bulb: | [Llama Stack / Inference](#llama-stack--inference-team) | [Stuck predictor pods accumulate](gotchas-llama-stack.md#3-multiple-stuck-predictor-pods-accumulate-bulb) | Log tailing attaches to wrong pod |
 | 13 | :warning: | [OpenClaw](#openclaw--agent-team) | [Multi-part content format breaks downstream tools](gotchas-application.md#multi-part-content-format-breaks-downstream-tools-warning) | 1+ hours — linked to NeMo crash (#2) |
 | 14 | :warning: | [Kagenti](#kagenti--platform-team) | [Webhook early return bypasses trace injection](gotchas-platform-kagenti.md#webhook-early-return-bypasses-trace-injection-warning) | 1 hour — only when sidecars disabled |
 | 15 | :warning: | [Sandboxed Containers](#openshift-sandboxed-containers--security-team) | [KataConfig deletion stuck on finalizer](gotchas-sandboxed-containers.md#5-kataconfig-deletion-stuck-on-finalizer) | 30 min — blocks cluster cleanup |
@@ -141,3 +144,15 @@ Owner: OpenShift sandboxed containers operator team
 | 18 | :bulb: | KataConfig reboots worker nodes | Use kataConfigPoolSelector |
 
 Full details: [gotchas-sandboxed-containers.md](gotchas-sandboxed-containers.md)
+
+### Llama Stack / Inference Team
+
+Owner: Llama Stack operator + vLLM / KServe
+
+| # | Severity | Gotcha | Impact |
+|---|----------|--------|--------|
+| 38 | :warning: | 3B model silently breaks safety rails | Guardrails appear to run but block nothing — no errors |
+| 39 | :warning: | KServe headless service not reachable cross-namespace | Must use Route instead of internal service |
+| 40 | :bulb: | Stuck predictor pods accumulate | Log tailing hits wrong pod |
+
+Full details: [gotchas-llama-stack.md](gotchas-llama-stack.md)
