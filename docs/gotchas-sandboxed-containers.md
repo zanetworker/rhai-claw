@@ -2,27 +2,81 @@
 
 Issues encountered attempting to run OpenClaw in sandboxed (Kata) containers on an AWS-hosted OpenShift cluster. We ultimately removed the sandboxed containers setup due to the complexity, but these findings are documented for future attempts.
 
-## 1. Native Kata doesn't work on AWS cloud VMs
+## Decision Tree
 
-**Symptom:** Pod stays in `ContainerCreating` forever. CRI-O logs show:
+Before diving into gotchas, understand the decision path. Each fork leads to a different class of problems.
+
+```
+Want VM-level pod isolation?
+├── Yes
+│   ├── Bare metal nodes available?
+│   │   ├── Yes → Native Kata (runtimeClassName: kata)
+│   │   │         Straightforward. Install operator, create KataConfig, done.
+│   │   │         Gotchas: node reboots (#2), scale limits (#6)
+│   │   │
+│   │   └── No (cloud VMs) → Nested virtualization?
+│   │       ├── Supported (Azure, some GCP) → Native Kata may work
+│   │       │   Not tested. Red Hat does not support nested virt in production.
+│   │       │
+│   │       └── Not supported (AWS) → DEAD END for native Kata
+│   │           You must use Peer Pods (kata-remote)
+│   │           ├── Peer Pods
+│   │           │   Each pod = separate EC2 instance
+│   │           │   Gotchas: AMI creation (#3), SG ports (#4), ConfigMap ordering (#7),
+│   │           │            deletion stuck (#5), IAM permissions throughout
+│   │           │   Verdict: WORKS but painful setup, ~10 steps, multiple IAM blockers
+│   │           │
+│   │           └── Bare metal instances (m5.metal, ~$4.6/hr)
+│   │               Real KVM, native Kata works. Expensive.
+│   │
+│   └── At scale (hundreds/thousands of pods)?
+│       └── DEAD END — see #6
+│           ~350 MiB overhead per VM, or 1 EC2 instance per pod
+│           Use NetworkPolicy + guardrails instead
+│
+└── No → Skip sandboxed containers entirely
+    Use NetworkPolicy + RBAC + NeMo Guardrails for isolation
+    This is what we did for the demo.
+```
+
+## Gotcha Severity
+
+| Rating | Meaning |
+|--------|---------|
+| **Obvious** | Expected if you understand the technology. Documented, discoverable. |
+| **Surprising** | Not obvious from docs. Costs hours of debugging. |
+| **Dead end** | No workaround on this path. Must change approach entirely. |
+
+## Obvious Gotchas
+
+These follow directly from how Kata/peer pods work. You'd expect them if you read the docs carefully.
+
+### 1. Native Kata needs bare metal — no nested virt on AWS
+
+**Severity: Obvious / Dead end on AWS cloud VMs**
+
+Kata runs workloads inside QEMU VMs. QEMU needs `/dev/kvm`. AWS cloud VMs (m6a, m5, c5, etc.) don't expose KVM to guests. No nested virtualization.
+
 ```
 qemu-kvm: Could not access KVM kernel module: No such file or directory
 qemu-kvm: failed to initialize kvm: No such file or directory
 ```
 
-**Root cause:** Native Kata (`runtimeClassName: kata`) needs `/dev/kvm` on the host, which requires hardware virtualization (Intel VT-x / AMD-V) exposed to the VM. Standard AWS instance types (m6a, m5, c5, etc.) don't expose nested virtualization. There's no `/dev/kvm` inside the EC2 VM.
+**Why it's "obvious":** Kata = hardware virtualization. Cloud VMs = already virtualized. VM-in-VM = nested virt. AWS doesn't do nested virt. This is in the Red Hat docs.
 
-**Workaround:** Use **peer pods** (`kata-remote`) instead — each pod runs as a separate EC2 instance rather than a QEMU VM inside the existing node. Or use bare metal instances (`m5.metal`, ~$4.6/hr) that have real KVM.
+**Why you might still hit it:** The `KataConfig` with `enablePeerPods: true` creates **both** `kata` and `kata-remote` RuntimeClasses. If you use `kata` instead of `kata-remote` on a cloud VM, you get the QEMU error above. The naming doesn't scream "this one won't work on your infra."
 
-**What to know:** This is not a bug — it's an infrastructure constraint. The `KataConfig` with `enablePeerPods: true` creates both `kata` and `kata-remote` RuntimeClasses, but only `kata-remote` works on cloud VMs.
+**Path forward:** Use `kata-remote` (peer pods) on cloud, or `m5.metal` bare metal instances (~$4.6/hr).
 
-## 2. KataConfig reboots worker nodes
+### 2. KataConfig reboots worker nodes (10-60 min)
 
-**Symptom:** After creating a `KataConfig` CR, worker nodes go `NotReady` / `SchedulingDisabled` and stay down for 10-60 minutes.
+**Severity: Obvious**
 
-**Root cause:** The operator creates a MachineConfig that installs RHCOS extensions (QEMU, kata-containers RPMs) and configures CRI-O. MachineConfig changes trigger a MachineConfigPool rollout, which reboots each node in the pool sequentially.
+The operator installs RHCOS extensions (QEMU, kata RPMs) and reconfigures CRI-O via MachineConfig. MachineConfig changes trigger node reboots.
 
-**Workaround:** Use `kataConfigPoolSelector` to target only specific nodes. Label one dedicated node (e.g., `node-role.kubernetes.io/kata-sandbox`) and target it in the KataConfig:
+**Why it's "obvious":** MachineConfig = node reboot. This is standard OpenShift behavior.
+
+**Workaround:** Use `kataConfigPoolSelector` to isolate the blast radius:
 
 ```yaml
 spec:
@@ -31,106 +85,101 @@ spec:
       node-role.kubernetes.io/kata-sandbox: ""
 ```
 
-This creates a separate MCP (`kata-oc`) containing only the labeled node. Only that node reboots. All other workers continue running.
+Create a dedicated MachineSet for sandbox nodes. Only those nodes reboot. Production workloads continue.
 
-**Best practice:** Create a dedicated MachineSet for sandbox nodes so you can add/remove them without affecting production workloads.
+### 6. Scaling sandboxed pods is impractical
 
-## 3. Peer pods need a pod VM AMI
+**Severity: Obvious / Dead end at scale**
 
-**Symptom:** After creating `KataConfig` with `enablePeerPods: true`, an `osc-podvm-image-creation` job runs and fails.
+| Mode | Overhead per pod | 4,000 pods |
+|------|-----------------|------------|
+| Native Kata | ~350 MiB RAM + 250m CPU | 1.4 TiB RAM, 1,000 vCPUs just for overhead |
+| Peer pods | 1 EC2 instance per pod | 4,000 instances at ~$0.04/hr = $160/hr |
 
-**Root cause:** Peer pods need a dedicated AMI (Amazon Machine Image) for the pod VMs — these are lightweight VMs that run the actual workload. The operator tries to build this AMI automatically using an S3 bucket and the EC2 `import-image` API.
+Benchmarks show native Kata maxes at ~134 containers per node vs ~377 for standard runc.
 
-The AMI creation can fail for several reasons:
-- S3 bucket name collision (deterministic naming, conflicts with previous attempts)
-- IAM permissions insufficient for `s3:CreateBucket`, `ec2:ImportImage`, `iam:CreateRole`
-- The `CredentialsRequest` for extended AWS permissions may not be fulfilled by the cloud credential operator
+**Why it's "obvious":** Each pod = a VM. VMs have overhead. This is the fundamental tradeoff of VM-level isolation.
 
-**Workaround:** If pod VM AMIs already exist in the account from a previous deployment, set `PODVM_AMI_ID` in the `peer-pods-cm` ConfigMap to skip automatic creation:
+**Recommendation:** Use Kata on a few demo pods. Use NetworkPolicy + NeMo Guardrails for the bulk.
 
+## Surprising Gotchas
+
+These cost real debugging time. Not well-documented, not intuitive.
+
+### 3. Pod VM AMI creation fails silently on IAM/S3 issues
+
+**Severity: Surprising**
+
+After creating `KataConfig` with peer pods, an `osc-podvm-image-creation` job runs to build the pod VM AMI. It frequently fails:
+
+- **S3 bucket name collision:** Deterministic naming (`podvm-image-XXXXXXXXX.0.1`). If a previous attempt created the bucket, the new attempt fails with `BucketAlreadyOwnedByYou` — but the script treats this as fatal instead of continuing.
+- **IAM permissions:** The `CredentialsRequest` asks for `s3:CreateBucket`, `ec2:ImportImage`, `iam:CreateRole`. The cloud credential operator may not grant all of these depending on the cluster's credential mode.
+- **No retry:** The job runs once and fails. The operator doesn't retry. You're left with a failed job and no AMI.
+
+**Why it's surprising:** The operator is supposed to handle AMI creation automatically. The docs say "PODVM_AMI_ID is populated when you run the KataConfig CR." In practice, the auto-creation is fragile.
+
+**Workaround:** Find an existing AMI and set it manually:
 ```bash
-# Find existing AMIs
 aws ec2 describe-images --owners self --filters "Name=name,Values=*podvm*" \
   --query 'Images[*].[ImageId,Name]' --output table
 
-# Set it in the ConfigMap
 oc patch configmap peer-pods-cm -n openshift-sandboxed-containers-operator \
   --type merge -p '{"data":{"PODVM_AMI_ID":"ami-0xxxxxxxxxxxx"}}'
 ```
 
-## 4. Peer pods need port 15150 open in security group
+### 4. Port 15150 not open — peer pod created but unreachable
 
-**Symptom:** Peer pod EC2 instance is created successfully (visible in AWS console), but the pod stays in `ContainerCreating`. The cloud-api-adaptor (CAA) logs show:
+**Severity: Surprising / Dead end without SG access**
+
+The peer pod EC2 instance is created (you can see it in AWS console), networking is set up (VXLAN tunnel configured), but the pod stays in `ContainerCreating` forever. CAA logs show:
+
 ```
 Retrying failed agent proxy connection: dial tcp 10.0.x.x:15150: connect: connection timed out
 ```
 
-**Root cause:** The CAA daemon on the worker node communicates with the kata-agent inside the peer pod VM on **TCP port 15150** (agent proxy) and **UDP port 9000** (VXLAN tunnel). The cluster's default security group may have port 9000 open but not 15150.
+**Why it's surprising:**
+1. The pod VM is running. The EC2 instance is healthy. Everything *looks* like it should work.
+2. Port 9000 (VXLAN) is in the default SG rules. Port 15150 (agent proxy) is not. The docs mention "enable ports 15150 and 9000" but don't automate it.
+3. The cluster's IAM credentials **cannot modify security groups.** You need out-of-band access (AWS Console or a privileged IAM user) to add the rule.
 
-**Workaround:** Add an inbound rule to the cluster's node security group:
+**Dead end if:** You don't have AWS Console access or a privileged IAM role. The cluster can create peer pod VMs but can never connect to them.
+
+**Fix:**
 ```bash
 aws ec2 authorize-security-group-ingress \
   --group-id sg-0xxxxxxxxxxxx \
   --ip-permissions "IpProtocol=tcp,FromPort=15150,ToPort=15150,UserIdGroupPairs=[{GroupId=sg-0xxxxxxxxxxxx}]"
 ```
 
-**Catch:** The cluster's machine API IAM credentials typically don't have `ec2:AuthorizeSecurityGroupIngress` permission. You need a user/role with SecurityGroup modify access, or do it through the AWS Console.
+### 5. KataConfig deletion stuck on finalizer
 
-## 5. KataConfig deletion gets stuck on pod VM image cleanup
+**Severity: Surprising**
 
-**Symptom:** `oc delete kataconfig` hangs indefinitely. Status shows `"Failed to delete Pod VM Image"`.
+`oc delete kataconfig` hangs indefinitely. Status: `"Failed to delete Pod VM Image"`.
 
-**Root cause:** The operator's finalizer tries to delete the pod VM AMI and its S3 bucket during cleanup. If the IAM credentials used for image creation have been rotated, or the S3 bucket was created by a different credential set, the cleanup fails and the finalizer blocks deletion.
+**Why it's surprising:** The operator's finalizer tries to clean up the AMI and S3 bucket. If the credentials that created them have been rotated (common in STS-mode clusters), or if a different credential set created the bucket, cleanup fails. The finalizer blocks deletion. Your cluster is stuck with a half-uninstalled KataConfig.
 
-**Workaround:** Remove the finalizer manually:
+**Workaround:**
 ```bash
 oc patch kataconfig <name> --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]'
 ```
 
-The AMI and S3 bucket remain in AWS. Clean them up manually if needed.
+The AMI and S3 bucket are orphaned in AWS. Clean up manually.
 
-## 6. Scaling: 4,000 sandboxed pods is impractical
+### 7. `peer-pods-cm` must exist BEFORE KataConfig
 
-**Symptom:** Not a bug — a design constraint for the keynote demo scenario.
+**Severity: Surprising**
 
-**Root cause:** Each Kata pod has significant overhead:
+If you create the `KataConfig` with `enablePeerPods: true` but the `peer-pods-cm` ConfigMap doesn't exist yet, the operator installs native Kata only. It creates the `kata` RuntimeClass but not `kata-remote`. No peer pod infrastructure is set up.
 
-| Mode | Overhead per pod | 4,000 pods |
-|------|-----------------|------------|
-| Native Kata | ~350 MiB RAM + 250m CPU (VM overhead) | 1.4 TiB RAM, 1,000 vCPUs just for overhead |
-| Peer pods | 1 EC2 instance per pod | 4,000 EC2 instances (t3.medium = ~$0.04/hr each = $160/hr) |
+**Why it's surprising:** You'd expect the operator to reconcile — detect the ConfigMap later and set up peer pods. It doesn't. The peer pods decision is made at KataConfig creation time only.
 
-Benchmarks show native Kata maxes at ~134 containers per node vs ~377 for standard runc.
+**Workaround:** Delete the KataConfig (triggers node reboot for uninstall), create the ConfigMap, then recreate the KataConfig (triggers another node reboot for install). Two reboots because of ordering.
 
-**Recommendation for scale:** Use NetworkPolicy + NeMo Guardrails for the safety story. Demonstrate Kata on a handful of pods for the "VM isolation" narrative. Don't try to run all 4,000 audience pods in sandboxed containers.
+The ConfigMap needs actual AWS resource IDs:
 
-## 7. `peer-pods-cm` ConfigMap must exist before KataConfig
-
-**Symptom:** `KataConfig` with `enablePeerPods: true` creates the `kata` RuntimeClass but not `kata-remote`. No peer pod resources appear.
-
-**Root cause:** The operator checks for the `peer-pods-cm` ConfigMap in `openshift-sandboxed-containers-operator` namespace. If it doesn't exist when the KataConfig is created, peer pods are not configured. The ConfigMap needs AWS details:
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: peer-pods-cm
-  namespace: openshift-sandboxed-containers-operator
-data:
-  CLOUD_PROVIDER: "aws"
-  VXLAN_PORT: "9000"
-  PODVM_INSTANCE_TYPE: "t3.medium"
-  PROXY_TIMEOUT: "5m"
-  DISABLECVM: "true"
-  AWS_REGION: "us-east-2"
-  AWS_SUBNET_ID: "subnet-0xxxxxxxxxxxx"
-  AWS_VPC_ID: "vpc-0xxxxxxxxxxxx"
-  AWS_SG_IDS: "sg-0xxxxxxxxxxxx"
-```
-
-**How to get the AWS IDs from the cluster:**
 ```bash
-# Use the cluster's own credentials
+# Get IDs from a running instance
 CREDS=$(oc get secret aws-cloud-credentials -n openshift-machine-api -o jsonpath='{.data.credentials}' | base64 -d)
 AWS_AK=$(echo "$CREDS" | grep aws_access_key_id | head -1 | awk '{print $3}')
 AWS_SK=$(echo "$CREDS" | grep aws_secret_access_key | head -1 | awk '{print $3}')
@@ -141,7 +190,25 @@ AWS_ACCESS_KEY_ID=$AWS_AK AWS_SECRET_ACCESS_KEY=$AWS_SK \
   --query 'Reservations[0].Instances[0].[SubnetId,VpcId,SecurityGroups[*].GroupId]' --output json
 ```
 
-**Workaround:** Create the ConfigMap before creating the KataConfig, or delete and recreate the KataConfig after creating the ConfigMap (which triggers another node reboot).
+## The UX Verdict
+
+Setting up peer pods on AWS requires ~10 ordered steps with multiple failure modes at each step. Several steps need credentials the cluster doesn't have. The feedback loop is slow (node reboots, AMI builds). When things fail, errors are often in operator logs rather than user-facing resources.
+
+| Step | Time | Can fail? | Recovery |
+|------|------|-----------|----------|
+| Install operator | 2 min | Rarely | Reinstall |
+| Create `peer-pods-cm` | 1 min | Need AWS IDs | Query from cluster |
+| Set `PODVM_AMI_ID` | 1 min | AMI may not exist | Build or find one |
+| Add SG port 15150 | 1 min | **Need out-of-band AWS access** | AWS Console |
+| Create sandbox MachineSet | 5-10 min | Node provisioning | Check AWS quotas |
+| Create KataConfig | 10-20 min | ConfigMap ordering, MCP issues | Delete + recreate (another reboot) |
+| Wait for MCP rollout | 10-20 min | Node reboot failures | Check MCP status |
+| Verify RuntimeClass | 1 min | May not appear if peer pods not configured | Check operator logs |
+| Test pod | 1-2 min | SG, AMI, networking | Check CAA logs |
+
+**Total happy path:** ~30-40 minutes. **With failures:** 1-3 hours (each KataConfig delete/recreate costs 20+ min in node reboots).
+
+**Compare to NetworkPolicy + NeMo Guardrails:** ~5 minutes, no node reboots, no AWS IAM dependencies, no AMI builds.
 
 ## Summary: Order of Operations for Peer Pods on AWS
 
