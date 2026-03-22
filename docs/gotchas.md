@@ -29,6 +29,7 @@ The top gotchas across all teams, ranked by how likely they are to block you and
 | 11 | :warning: | [Kagenti](#kagenti--platform-team) | [`spec.trace` doesn't inject OTEL env vars — webhook bug](gotchas-platform-kagenti.md#spectrace-doesnt-inject-otel-env-vars-warning) | 1+ hours — trace config exists but does nothing |
 | 12 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [Self-check prompt flags agent metadata as attacks](gotchas-nemo-guardrails.md#5-self-check-prompt-too-sensitive-to-agent-metadata-warning) | 30 min — false positives on every message |
 | 36 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [NeMo depends on LangChain for LLM access — provider lock-in](gotchas-nemo-guardrails.md#7-nemo-guardrails-depends-on-langchain-for-llm-access-warning) | Limits which models can evaluate safety. Explore Llama Stack alternative. |
+| 37 | :no_entry: | [TrustyAI / NeMo](#trustyai--safety-team) | [NeMo only accepts OpenAI format — can't guard Anthropic Messages API traffic](gotchas-nemo-guardrails.md#8-nemo-guardrails-only-accepts-openai-format--cant-guard-anthropic-messages-api-traffic-no_entry) | Agents using Anthropic directly bypass guardrails entirely |
 | 13 | :warning: | [OpenClaw](#openclaw--agent-team) | [Multi-part content format breaks downstream tools](gotchas-application.md#multi-part-content-format-breaks-downstream-tools-warning) | 1+ hours — linked to NeMo crash (#2) |
 | 14 | :warning: | [Kagenti](#kagenti--platform-team) | [Webhook early return bypasses trace injection](gotchas-platform-kagenti.md#webhook-early-return-bypasses-trace-injection-warning) | 1 hour — only when sidecars disabled |
 | 15 | :warning: | [Sandboxed Containers](#openshift-sandboxed-containers--security-team) | [KataConfig deletion stuck on finalizer](gotchas-sandboxed-containers.md#5-kataconfig-deletion-stuck-on-finalizer) | 30 min — blocks cluster cleanup |
@@ -104,6 +105,7 @@ Owner: TrustyAI operator + NeMo Guardrails integration in RHOAI
 | 10 | :warning: | RHOAI image missing `langchain-anthropic` | Blocks Anthropic engine |
 | 12 | :warning: | Self-check prompt too sensitive to metadata | False positives on normal messages |
 | 36 | :warning: | NeMo depends on LangChain for LLM access | Provider lock-in, explore Llama Stack / vLLM alternatives |
+| 37 | :no_entry: | NeMo only accepts OpenAI format — can't guard Anthropic Messages API traffic | Agents using Anthropic directly bypass guardrails |
 
 **Path to CRD-based deployment:** 5 steps needed across TrustyAI team and NeMo upstream. See [gotchas-nemo-guardrails.md § Path to TrustyAI Service Operator](gotchas-nemo-guardrails.md#path-to-trustyai-service-operator-crd-based-deployment).
 

@@ -155,6 +155,47 @@ This is a hidden dependency chain: NeMo → LangChain → provider-specific Lang
 
 **Workaround:** Use `engine: openai` with GPT-4o-mini (works with the RHOAI image). Or `engine: openai` pointed at any OpenAI-compatible endpoint (vLLM, Llama Stack, LiteLLM).
 
+### 8. NeMo Guardrails only accepts OpenAI format — can't guard Anthropic Messages API traffic :no_entry:
+
+**Priority rank: NEW**
+
+**Symptom:** An agent configured to use Anthropic's built-in provider (e.g., OpenClaw with `claude-sonnet-4-20250514 · anthropic` selected) sends requests using the Anthropic Messages API format (`POST /v1/messages`). NeMo Guardrails can't intercept or proxy these requests — it only accepts OpenAI chat completions format (`POST /v1/chat/completions`).
+
+**The distinction that causes confusion:**
+
+NeMo has two separate concepts that both involve "Anthropic":
+
+| Concept | What it means | Works? |
+|---------|--------------|--------|
+| `engine: anthropic` in NeMo config | NeMo *calls* Anthropic to evaluate safety rails (internal, outbound) | Yes (if `langchain-anthropic` is installed) |
+| Receiving Anthropic Messages format requests | NeMo *accepts* requests from agents using Anthropic wire protocol (inbound) | No — not supported |
+
+`engine: anthropic` means NeMo can use Claude as its internal LLM for checking rails. It does NOT mean NeMo can sit in front of an agent that speaks Anthropic Messages API.
+
+**Why this matters:**
+
+If an enterprise deploys agents that use Anthropic directly (common — Claude is a top-tier model), there's no way to put NeMo Guardrails in front of them without changing the agent's provider configuration. The agent must be rewired to send OpenAI format to a guardrails proxy, which then calls whatever backend it wants.
+
+```
+DOESN'T WORK:
+Agent ──Anthropic Messages format──▶ NeMo ──▶ Anthropic API
+       POST /v1/messages              ✗ NeMo doesn't have this endpoint
+
+WORKS (but requires agent config change):
+Agent ──OpenAI format──▶ Adapter ──▶ NeMo ──engine:anthropic──▶ Anthropic API
+       POST /v1/chat/completions            (internal, via LangChain)
+```
+
+**What would fix this:**
+
+| Option | Owner | Effort |
+|--------|-------|--------|
+| NeMo adds `/v1/messages` endpoint | NeMo upstream | High — needs full Anthropic protocol support (streaming SSE format differs, `content` blocks, `max_tokens` required) |
+| Adapter translates Anthropic ↔ OpenAI bidirectionally | Us / platform team | Medium — adapter detects format, converts both directions |
+| Agent frameworks support guardrails proxy config | Agent upstream (OpenClaw, etc.) | Medium — `proxyUrl` per provider that routes traffic through a proxy |
+
+**Current workaround:** Configure the agent to use a custom `guardrails-proxy` provider with `api: openai-completions` instead of the built-in Anthropic provider. This means the agent talks OpenAI format to the proxy, and NeMo handles the rest. The agent's users can't select the built-in Anthropic model from the UI — they must use the guardrails-wrapped model.
+
 ## Dead Ends
 
 ### 6. `NemoGuardrail` CRD doesn't support custom commands :no_entry:
