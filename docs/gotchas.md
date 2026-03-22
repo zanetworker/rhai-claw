@@ -88,6 +88,8 @@ Owner: Kagenti operator + kagenti-extensions
 
 Full details: [gotchas-platform-kagenti.md](gotchas-platform-kagenti.md)
 
+**Onboarding feedback:** Webhook complexity, AgentRuntime-per-Deployment friction, developer mandates (env vars, identity), lean mode proposal. See [gotchas-kagenti-onboarding.md](gotchas-kagenti-onboarding.md).
+
 ### TrustyAI / Safety Team
 
 Owner: TrustyAI operator + NeMo Guardrails integration in RHOAI

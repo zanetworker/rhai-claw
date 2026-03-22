@@ -267,14 +267,14 @@ We hit 35 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, sandboxed co
 | Team | Owner | Count | Details |
 |------|-------|-------|---------|
 | [OpenClaw / Agent](docs/gotchas.md#openclaw--agent-team) | OpenClaw upstream | 7 | Loopback binding, hardcoded port, token regen, broken OTEL extension, multi-part content |
-| [Kagenti / Platform](docs/gotchas.md#kagenti--platform-team) | Kagenti operator + extensions | 9 | Namespace labels, AgentCard sync, trace injection, CRD lifecycle, webhook RBAC |
+| [Kagenti / Platform](docs/gotchas.md#kagenti--platform-team) | Kagenti operator + extensions | 9 + [onboarding feedback](docs/gotchas-kagenti-onboarding.md) | Namespace labels, AgentCard sync, trace injection, CRD lifecycle, webhook friction, lean mode |
 | [TrustyAI / Safety](docs/gotchas.md#trustyai--safety-team) | TrustyAI operator + NeMo in RHOAI | 6 | Response format, list content crash, streaming, missing packages, CRD path blocked |
 | [MLflow / Observability](docs/gotchas.md#mlflow--observability-team) | MLflow operator + OTEL | 6 | HTTP vs GenAI traces, Host header, silent errors, latency attribution |
 | [Sandboxed Containers / Security](docs/gotchas.md#openshift-sandboxed-containers--security-team) | Sandboxed containers operator | 7 | No nested virt on AWS, node reboots, AMI creation, SG ports, peer pods config |
 
 Deep-dive docs per area:
 - [docs/gotchas-application.md](docs/gotchas-application.md)
-- [docs/gotchas-platform-kagenti.md](docs/gotchas-platform-kagenti.md)
+- [docs/gotchas-platform-kagenti.md](docs/gotchas-platform-kagenti.md) + [onboarding feedback](docs/gotchas-kagenti-onboarding.md)
 - [docs/gotchas-nemo-guardrails.md](docs/gotchas-nemo-guardrails.md)
 - [docs/gotchas-mlflow-tracing.md](docs/gotchas-mlflow-tracing.md)
 - [docs/gotchas-sandboxed-containers.md](docs/gotchas-sandboxed-containers.md)
