@@ -60,13 +60,13 @@ Owner: OpenClaw upstream
 
 | # | Severity | Gotcha | Impact |
 |---|----------|--------|--------|
+| 31 | :no_entry: | `diagnostics-otel` extension broken | Blocks GenAI traces |
+| 13 | :warning: | Multi-part content format | Breaks downstream tools expecting string content |
 | 16 | :bulb: | Binds to loopback by default | Agent unreachable in K8s |
 | 17 | :bulb: | Hardcoded port 18789 | `PORT` env var ignored |
 | 19 | :bulb: | Gateway token regenerates on restart | Re-pairing needed |
 | 20 | :bulb: | Device pairing required after reconnect | UX friction |
 | 32 | :bulb: | Browser automation broken | No Chrome in image |
-| 31 | :no_entry: | `diagnostics-otel` extension broken | Blocks GenAI traces |
-| 13 | :warning: | Multi-part content format | Breaks downstream tools expecting string content |
 
 Full details: [gotchas-application.md](gotchas-application.md)
 
@@ -82,9 +82,9 @@ Owner: Kagenti operator + kagenti-extensions
 | 26 | :bulb: | Deployment name mismatch in webhook | AgentRuntime lookup fails |
 | 21 | :bulb: | AgentRuntime CRD not in Helm chart | Manual install needed |
 | 22 | :bulb: | CRDs get stuck terminating | Patch finalizers |
-| 27 | :bulb: | AgentCards CRD only from Helm first-install | Don't delete CRDs |
 | 23 | :bulb: | Empty secrets cause silent failures | Skill verifies content length |
 | 25 | :bulb: | AgentCard SYNCED=False for non-A2A agents | ConfigMap fetcher workaround |
+| 27 | :bulb: | AgentCards CRD only from Helm first-install | Don't delete CRDs |
 
 Full details: [gotchas-platform-kagenti.md](gotchas-platform-kagenti.md)
 
@@ -94,12 +94,12 @@ Owner: TrustyAI operator + NeMo Guardrails integration in RHOAI
 
 | # | Severity | Gotcha | Impact |
 |---|----------|--------|--------|
+| 30 | :no_entry: | `NemoGuardrail` CRD can't add sidecars | Blocks CRD deployment path |
 | 2 | :warning: | `get_colang_history()` crashes on list content | Silent crash after response generated |
 | 3 | :warning: | Response format not OpenAI-compatible | 200 OK but empty responses |
 | 7 | :warning: | No streaming support | Clients hang or broken pipes |
 | 10 | :warning: | RHOAI image missing `langchain-anthropic` | Blocks Anthropic engine |
 | 12 | :warning: | Self-check prompt too sensitive to metadata | False positives on normal messages |
-| 30 | :no_entry: | `NemoGuardrail` CRD can't add sidecars | Blocks CRD deployment path |
 
 **Path to CRD-based deployment:** 5 steps needed across TrustyAI team and NeMo upstream. See [gotchas-nemo-guardrails.md § Path to TrustyAI Service Operator](gotchas-nemo-guardrails.md#path-to-trustyai-service-operator-crd-based-deployment).
 
@@ -111,8 +111,8 @@ Owner: MLflow operator + OTEL integration
 
 | # | Severity | Gotcha | Impact |
 |---|----------|--------|--------|
-| 5 | :warning: | OTLP rejected — port in Host header | Silently drops all traces |
 | 29 | :no_entry: | Traces HTTP-level only, not GenAI-level | No prompts, completions, or token counts |
+| 5 | :warning: | OTLP rejected — port in Host header | Silently drops all traces |
 | 33 | :bulb: | OTEL export errors are silent | Set OTEL_LOG_LEVEL=debug |
 | 34 | :bulb: | No OTEL Collector | Deploy for production |
 | 35 | :bulb: | Guardrails latency appears as LLM latency | Need span label separation |
@@ -127,11 +127,11 @@ Owner: OpenShift sandboxed containers operator team
 | # | Severity | Gotcha | Impact |
 |---|----------|--------|--------|
 | 1 | :no_entry: | Native Kata doesn't work on AWS cloud VMs | Must use peer pods or bare metal |
+| 28 | :no_entry: | 4,000 sandboxed pods impractical | Design constraint |
 | 6 | :warning: | Port 15150 not open — peer pod unreachable | Dead end without SG access |
 | 8 | :warning: | Pod VM AMI creation fails on S3/IAM | No retry, fragile auto-provisioning |
 | 9 | :warning: | `peer-pods-cm` must exist before KataConfig | No reconciliation, costs a reboot to fix |
 | 15 | :warning: | KataConfig deletion stuck on finalizer | Blocks cluster cleanup |
 | 18 | :bulb: | KataConfig reboots worker nodes | Use kataConfigPoolSelector |
-| 28 | :no_entry: | 4,000 sandboxed pods impractical | Design constraint |
 
 Full details: [gotchas-sandboxed-containers.md](gotchas-sandboxed-containers.md)
