@@ -47,7 +47,9 @@ Owner: TrustyAI operator + NeMo Guardrails integration in RHOAI
 | No streaming support in NeMo server | Clients sending `stream: true` get no SSE — connection hangs or breaks | Workaround: adapter strips stream flag, converts response to SSE |
 | RHOAI image missing `langchain-anthropic` | NeMo can't use Anthropic as guardrails LLM engine | Workaround: `pip install` at pod startup (+15s) |
 | Self-check prompt too sensitive to metadata | OpenClaw's internal metadata (component names, timestamps) triggers false safety violations | Workaround: tuned prompt to explicitly ignore system metadata |
-| `NemoGuardrail` CRD doesn't support command overrides | Can't use CRD path because no way to pip install missing packages | Workaround: standalone Deployment instead of CRD |
+| `NemoGuardrail` CRD doesn't support command overrides | Can't use CRD path because no way to pip install missing packages or add sidecar | Workaround: standalone Deployment instead of CRD |
+
+**Path to CRD-based deployment:** 5 steps needed across TrustyAI team (image fix + CRD sidecar support) and NeMo upstream (list content fix + OpenAI response format + streaming). See [gotchas-nemo-guardrails.md § Path to TrustyAI Service Operator](gotchas-nemo-guardrails.md#path-to-trustyai-service-operator-crd-based-deployment) for the full breakdown.
 
 Full details: [gotchas-nemo-guardrails.md](gotchas-nemo-guardrails.md)
 
@@ -65,3 +67,19 @@ Owner: MLflow operator + OTEL integration
 | Experiment ID must be header | Traces go to experiment "0" without `x-mlflow-experiment-id` header | Workaround: preload script sets header |
 
 Full details: [gotchas-mlflow-tracing.md](gotchas-mlflow-tracing.md)
+
+## OpenShift Sandboxed Containers / Security Team
+
+Owner: OpenShift sandboxed containers operator team
+
+| Gotcha | Impact | Status |
+|--------|--------|--------|
+| Native Kata doesn't work on AWS cloud VMs | No `/dev/kvm` — QEMU fails to start, pod stuck in `ContainerCreating` | Use peer pods (`kata-remote`) or bare metal instances |
+| KataConfig reboots worker nodes | 10-60 min downtime per node during MachineConfig rollout | Use `kataConfigPoolSelector` to target only dedicated sandbox nodes |
+| Pod VM AMI creation fails | S3 bucket collisions, IAM permission gaps block automatic AMI build | Set `PODVM_AMI_ID` manually in `peer-pods-cm` if AMI already exists |
+| Port 15150 not open in security group | Peer pod VM created but agent proxy connection times out | Manual SG rule needed — cluster IAM can't modify SGs |
+| KataConfig deletion stuck on image cleanup | Finalizer blocks deletion when AMI/S3 cleanup fails | Remove finalizer manually with `oc patch` |
+| `peer-pods-cm` must exist before KataConfig | Peer pods not configured if ConfigMap missing at KataConfig creation time | Create ConfigMap first, or delete/recreate KataConfig |
+| 4,000 sandboxed pods impractical | ~350 MiB overhead per VM (native) or 1 EC2 instance per pod (peer pods) | Use NetworkPolicy + guardrails for scale, Kata for demo only |
+
+Full details: [gotchas-sandboxed-containers.md](gotchas-sandboxed-containers.md)

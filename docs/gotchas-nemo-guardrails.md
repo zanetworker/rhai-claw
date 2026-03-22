@@ -116,6 +116,46 @@ Also changed the `instructions` from "You are a safety guardrail" (which caused 
 
 **What should be fixed:** The `NemoGuardrail` CRD should support init containers, command overrides, or an `extraPackages` field for installing additional Python packages.
 
+## Path to TrustyAI Service Operator (CRD-based deployment)
+
+The `NemoGuardrail` CRD (`nemoguardrails.trustyai.opendatahub.io`) exists on RHOAI 3.3+ clusters and is managed by the TrustyAI Service Operator. Using it instead of our standalone Deployment would be the "proper" RHOAI-native path. Here's what's blocking it and who needs to fix what.
+
+### What needs to happen
+
+| Step | Owner | What | Why |
+|------|-------|------|-----|
+| 1 | **TrustyAI team** | Add `langchain-anthropic` to the RHOAI NeMo image | Image ships `langchain-openai` only. Using Anthropic as the guardrails LLM engine crashes at startup. |
+| 2 | **NeMo upstream** | Fix `get_colang_history()` to handle list content | One-line fix: `if isinstance(content, list): content = " ".join(...)` before `.rsplit()`. Affects anyone sending OpenAI multi-part format. |
+| 3 | **NeMo upstream** | Return OpenAI-compatible response format from `/v1/chat/completions` | Currently returns `{"messages": [...]}` instead of `{"choices": [...]}`. Every OpenAI-compatible client breaks. |
+| 4 | **NeMo upstream** | Support `stream: true` parameter | Modern LLM clients default to streaming. NeMo ignores the flag and returns a single JSON blob, causing timeouts and broken pipes. |
+| 5 | **TrustyAI team** | Add sidecar/init container support to `NemoGuardrail` CRD | Escape hatch: if upstream NeMo fixes take time, the CRD should allow injecting an adapter sidecar or running pip install via init container. |
+
+### What works today with the CRD (without Anthropic)
+
+If you use a **self-hosted model via vLLM** instead of Anthropic, you can skip step 1:
+
+```yaml
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: NemoGuardrail
+metadata:
+  name: openclaw-guardrails
+  namespace: openclaw
+spec:
+  image: quay.io/trustyai/nemo-guardrails-server:latest
+  config:
+    configMapName: openclaw-guardrails-config
+  model:
+    engine: openai
+    apiBase: http://your-vllm-svc.namespace.svc.cluster.local:8000/v1
+    model: your-model-name
+```
+
+But you still need the adapter sidecar (steps 2-4), and the CRD doesn't support adding one (step 5). So the CRD path is blocked until either NeMo fixes 2-4 or TrustyAI adds step 5.
+
+### When the CRD path will work
+
+Once steps 1-4 are fixed upstream, the deployment simplifies from our current 3-manifest setup (ConfigMap + 2-container Deployment + Service) to a single `NemoGuardrail` CR. The adapter sidecar becomes unnecessary, and the TrustyAI operator manages the lifecycle.
+
 ## Architecture: The Adapter Pattern
 
 Because of gotchas 1-3, we deploy a lightweight Python sidecar (`openai-adapter`) alongside the NeMo Guardrails container:

@@ -260,7 +260,7 @@ OpenClaw connects to the guardrails proxy via a custom model provider in `opencl
 
 ## Gotchas by Team
 
-We hit 28 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, and MLflow tracing. The `/deploy-openclaw` skill handles all of them automatically. Each team has its own section with impact and status:
+We hit 35 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, sandboxed containers, and MLflow tracing. The `/deploy-openclaw` skill handles most of them automatically. Each team has its own section with impact and status:
 
 **[docs/gotchas.md](docs/gotchas.md)** — the full index with tables per team:
 
@@ -268,14 +268,16 @@ We hit 28 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, and MLflow t
 |------|-------|-------|---------|
 | [OpenClaw / Agent](docs/gotchas.md#openclaw--agent-team) | OpenClaw upstream | 7 | Loopback binding, hardcoded port, token regen, broken OTEL extension, multi-part content |
 | [Kagenti / Platform](docs/gotchas.md#kagenti--platform-team) | Kagenti operator + extensions | 9 | Namespace labels, AgentCard sync, trace injection, CRD lifecycle, webhook RBAC |
-| [TrustyAI / Safety](docs/gotchas.md#trustyai--safety-team) | TrustyAI operator + NeMo in RHOAI | 6 | Response format, list content crash, streaming, missing packages, prompt sensitivity |
+| [TrustyAI / Safety](docs/gotchas.md#trustyai--safety-team) | TrustyAI operator + NeMo in RHOAI | 6 | Response format, list content crash, streaming, missing packages, CRD path blocked |
 | [MLflow / Observability](docs/gotchas.md#mlflow--observability-team) | MLflow operator + OTEL | 6 | HTTP vs GenAI traces, Host header, silent errors, latency attribution |
+| [Sandboxed Containers / Security](docs/gotchas.md#openshift-sandboxed-containers--security-team) | Sandboxed containers operator | 7 | No nested virt on AWS, node reboots, AMI creation, SG ports, peer pods config |
 
 Deep-dive docs per area:
 - [docs/gotchas-application.md](docs/gotchas-application.md)
 - [docs/gotchas-platform.md](docs/gotchas-platform.md)
 - [docs/gotchas-nemo-guardrails.md](docs/gotchas-nemo-guardrails.md)
 - [docs/gotchas-mlflow-tracing.md](docs/gotchas-mlflow-tracing.md)
+- [docs/gotchas-sandboxed-containers.md](docs/gotchas-sandboxed-containers.md)
 
 ## AgentRuntime Controller
 
