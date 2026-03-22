@@ -2,7 +2,15 @@
 
 Issues encountered setting up OTEL tracing from OpenClaw to MLflow. The current setup produces HTTP-level traces. This doc explains what's missing for full GenAI-level traces and what needs to happen.
 
-## Current State: HTTP-Level Traces Only
+## Severity
+
+| Rating | Icon | Meaning |
+|--------|------|---------|
+| **Dead end** | :no_entry: | No workaround on this path. Must change approach. |
+| **Surprising** | :warning: | Not obvious from docs. Costs hours of debugging. |
+| **Obvious** | :bulb: | Expected if you know the tech. |
+
+## Current State: HTTP-Level Traces Only :no_entry:
 
 The OTEL preload script (`manifests/otel-tracing-configmap.yaml`) monkey-patches `globalThis.fetch` in Node.js to intercept outgoing HTTP calls to LLM providers. It creates spans with:
 
@@ -142,23 +150,23 @@ The adapter would need the OTEL Python SDK installed (`opentelemetry-sdk`, `open
 
 ## MLflow-Specific Gotchas
 
-### 1. MLflow rejects OTLP with port in Host header
+### 1. MLflow rejects OTLP with port in Host header :warning:
 
 MLflow 3.x has DNS rebinding protection. The OTEL SDK sends `Host: mlflow-service.test.svc.cluster.local:5000` but MLflow's `--allowed-hosts` list only had the hostname without port. Every trace was silently rejected (400).
 
 **Fix:** Add `hostname:port` to MLflow's `ALLOWED_HOSTS`.
 
-### 2. OTEL export errors are silent
+### 2. OTEL export errors are silent :warning:
 
 The Node.js OTEL SDK's `OTLPTraceExporter` swallows HTTP errors by default. When MLflow rejects traces (400, 403, etc.), no error appears in OpenClaw's logs. You only discover the problem by curling MLflow's `/v1/traces` endpoint directly.
 
 **Fix:** Set `OTEL_LOG_LEVEL=debug` to see exporter errors, or check MLflow's access logs.
 
-### 3. MLflow experiment ID must be passed as header
+### 3. MLflow experiment ID must be passed as header :bulb:
 
 MLflow's OTLP endpoint routes traces to experiments via the `x-mlflow-experiment-id` header. Without it, traces go to experiment "0" (default). The preload script passes this header, but if you use a different exporter or collector, you need to configure it.
 
-### 4. No OTEL Collector — direct export only
+### 4. No OTEL Collector — direct export only :bulb:
 
 The current setup exports traces directly from the OpenClaw pod to MLflow's `/v1/traces` endpoint. There's no OTEL Collector in between. This means:
 - No batching (each span is exported individually)
@@ -168,7 +176,7 @@ The current setup exports traces directly from the OpenClaw pod to MLflow's `/v1
 
 For production, deploy an OTEL Collector as a sidecar or cluster service that batches, retries, and routes traces.
 
-### 5. Guardrails latency appears as LLM latency
+### 5. Guardrails latency appears as LLM latency :bulb:
 
 With NeMo Guardrails in the path, each "LLM call" in the trace includes the guardrails processing time (5 rail checks + actual LLM call). A single user message generates ~5 spans: the self-check input call, canonical form call, LLM generation call, self-check output call, plus the top-level call. Total latency is 10-20s, which looks like a very slow LLM but is actually the guardrails pipeline.
 

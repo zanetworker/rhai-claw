@@ -2,7 +2,17 @@
 
 Issues encountered integrating NeMo Guardrails with OpenClaw on Red Hat AI. Each gotcha includes the root cause, our workaround, and what should be fixed upstream.
 
-## 1. Response format mismatch (NeMo vs OpenAI)
+## Severity
+
+| Rating | Icon | Meaning |
+|--------|------|---------|
+| **Dead end** | :no_entry: | No workaround on this path. Must change approach. |
+| **Surprising** | :warning: | Not obvious from docs. Costs hours of debugging. |
+| **Obvious** | :bulb: | Expected if you know the tech. |
+
+## Surprising
+
+### 1. Response format mismatch (NeMo vs OpenAI) :warning:
 
 **Symptom:** OpenClaw shows empty responses. The guardrails service returns 200 OK but the content is missing.
 
@@ -22,7 +32,7 @@ NeMo's docs describe the endpoint as "OpenAI-compatible" but the response shape 
 
 **What should be fixed:** NeMo Guardrails server should return standard OpenAI response format when the request comes in on `/v1/chat/completions`. Or expose a separate truly-OpenAI-compatible endpoint.
 
-## 2. Multi-part content crashes `get_colang_history()`
+### 2. Multi-part content crashes `get_colang_history()` :warning:
 
 **Symptom:** First message works fine. Second message returns "Internal server error." The guardrails correctly blocks/allows the request, generates the response, then crashes during post-processing.
 
@@ -55,7 +65,7 @@ for msg in req_json.get("messages", []):
 
 **What should be fixed:** `get_colang_history()` should handle both string and list content formats. The OpenAI multi-part format is standard and widely used. A simple `if isinstance(content, list): content = " ".join(p.get("text","") for p in content if isinstance(p, dict))` before the `.rsplit()` would fix it.
 
-## 3. No streaming support
+### 3. No streaming support :warning:
 
 **Symptom:** OpenClaw sends `"stream": true` in requests. NeMo Guardrails ignores the flag and returns a single JSON response. OpenClaw expects SSE (Server-Sent Events) chunks and shows empty output or "Internal server error."
 
@@ -74,7 +84,7 @@ The entire response is sent as a single SSE chunk (not token-by-token), so the u
 
 **What should be fixed:** NeMo Guardrails should support streaming. The rails processing is inherently non-streaming (all checks must complete before the response), but the response delivery could be streamed token-by-token after the output rails pass.
 
-## 4. RHOAI image missing `langchain-anthropic`
+### 4. RHOAI image missing `langchain-anthropic` :warning:
 
 **Symptom:** NeMo Guardrails pod crashes on startup with `ModuleNotFoundError: No module named 'langchain_anthropic'` when configured to use Anthropic as the LLM engine.
 
@@ -89,7 +99,7 @@ This adds ~15s to pod startup time.
 
 **What should be fixed:** The RHOAI NeMo Guardrails image should include `langchain-anthropic` (and `langchain-google-genai` etc.) to support all major LLM providers out of the box.
 
-## 5. Self-check prompt too sensitive to agent metadata
+### 5. Self-check prompt too sensitive to agent metadata :warning:
 
 **Symptom:** NeMo Guardrails blocks normal "hello" messages. The self-check input rail flags benign messages as "SAFETY VIOLATION DETECTED: Potential system exploitation attempt."
 
@@ -106,7 +116,9 @@ Also changed the `instructions` from "You are a safety guardrail" (which caused 
 
 **What should be fixed:** The default self-check prompts should be resilient to common message envelope patterns. Agent frameworks routinely add metadata/context to messages. The self-check should evaluate the user's intent, not the transport metadata.
 
-## 6. `NemoGuardrail` CRD (NIM Operator) doesn't support custom commands
+## Dead Ends
+
+### 6. `NemoGuardrail` CRD doesn't support custom commands :no_entry:
 
 **Symptom:** Cannot use the `NemoGuardrail` CRD from the NIM Operator to deploy with `langchain-anthropic` because the CRD doesn't allow command overrides.
 

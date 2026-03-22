@@ -1,37 +1,88 @@
-# Application Gotchas (Agent-Side)
+# Application Gotchas (OpenClaw Agent-Side)
 
 These are OpenClaw-specific behaviors. The `/deploy-openclaw` skill handles all of them automatically.
 
-## OpenClaw binds to loopback by default
+## Severity
 
-OpenClaw is designed as a personal assistant — it runs on your laptop and listens on `127.0.0.1:18789` so only local connections can reach it. This is a deliberate security choice for single-user mode.
+| Rating | Icon | Meaning |
+|--------|------|---------|
+| **Dead end** | :no_entry: | No workaround. Must change approach. |
+| **Surprising** | :warning: | Not obvious from docs. Costs hours. |
+| **Obvious** | :bulb: | Expected if you know the tech. |
 
-In Kubernetes, the Service routes traffic to the pod's IP, not `127.0.0.1`. If the agent only listens on loopback, the Service health checks fail and no traffic reaches the agent. The fix is `openclaw config set gateway.bind lan`, which tells OpenClaw to listen on `0.0.0.0`.
+## Surprising
 
-The deployment handles this with an init container that runs the config command before the main container starts. The config is written to a shared `emptyDir` volume so the main container picks it up.
+### Multi-part content format breaks downstream tools :warning:
 
-Any agent you deploy on Kubernetes must listen on `0.0.0.0` on its declared port. This is the agent's responsibility, not the platform's.
+**Priority rank: #13**
 
-## OpenClaw uses port 18789, not 8000
+OpenClaw sends message `content` as a list of typed blocks (OpenAI multi-part format):
+```json
+{"content": [{"type": "text", "text": "hello"}]}
+```
 
-OpenClaw's gateway listens on port 18789 by default — this is hardcoded in the application, not configurable via the standard `PORT` environment variable. We initially set `PORT=8000` and `containerPort: 8000` in the deployment, which resulted in a working pod with no reachable service. Debugging with `/proc/net/tcp` inside the container revealed the actual listening port.
+This is valid per the OpenAI API spec, but tools downstream (NeMo Guardrails, custom proxies) that do string operations on `content` crash. NeMo's `get_colang_history()` calls `.rsplit()` on the content, which throws `TypeError: must be str or None, not list`.
 
-The Service, Route, and `containerPort` must all use 18789. The browser control server listens on a separate port (18791) on loopback only.
+**Why it's surprising:** The format is technically correct. You don't expect a valid OpenAI message to break an OpenAI-compatible endpoint. The crash happens in post-processing, not during the obvious request handling path.
 
-## Gateway token regenerates on every pod restart
+**Workaround:** Adapter normalizes `content` from list to string before forwarding.
 
-OpenClaw auto-generates a gateway auth token on first boot and writes it to `openclaw.json` in its state directory. Because the deployment uses an `emptyDir` volume (needed so the init container can write config), the state directory is ephemeral. Every pod restart generates a fresh token.
+## Dead Ends
 
-This means you need to run `make token` after any restart to get the current token. A persistent volume would fix this, but adds complexity for a demo deployment.
+### `diagnostics-otel` extension broken in image :no_entry:
 
-## Device pairing required after every reconnect
+**Priority rank: #31**
 
-OpenClaw's Control UI uses a device pairing model borrowed from messaging apps — when a new browser session connects via WebSocket, it registers as a "device" that needs operator approval. This prevents unauthorized access even if someone has the gateway URL and token.
+OpenClaw has a built-in `diagnostics-otel` extension designed for GenAI-level OTEL tracing (prompt text, completion text, token counts, tool calls). The extension's `index.js` is missing from the container image build:
 
-After connecting in the dashboard, you see "pairing required." Run `make approve-pairing` to accept the pending device. The pairing persists across page refreshes but is lost when the pod restarts (same `emptyDir` issue as the token).
+```
+[plugins] extension entry escapes package directory: ./index.js (source=/app/dist/extensions/diffs)
+```
 
-## Browser automation fails
+This blocks the best path to full GenAI observability. No workaround without fixing the image build.
 
-OpenClaw includes a browser automation tool that uses Chrome/Chromium for web scraping, screenshots, and page interaction. The `quay.io/aicatalyst/openclaw:latest` container image doesn't ship a Chrome binary — the tool executes but can't find a browser, returning "can't use browser automation in this environment."
+### Browser automation broken :bulb:
 
-This is a container image limitation, not a platform restriction. OpenClaw's `openclaw browser status` shows `detectedBrowser: unknown`. A custom image with Chromium installed, or a remote browser sidecar, would fix this.
+**Priority rank: #32**
+
+Chrome/Chromium is not in the `quay.io/aicatalyst/openclaw:latest` image. `openclaw browser status` shows `detectedBrowser: unknown`. Web scraping, screenshots, and page interaction tools fail.
+
+Not a platform issue — needs Chromium added to the image or a remote browser sidecar.
+
+## Obvious
+
+### Binds to loopback by default :bulb:
+
+**Priority rank: #16**
+
+OpenClaw listens on `127.0.0.1:18789` — a deliberate security choice for single-user laptop mode. In Kubernetes, the Service routes to the pod IP, not loopback. Agent is unreachable.
+
+**Why it's obvious:** Any agent designed for localhost won't work in K8s without binding to `0.0.0.0`.
+
+**Fix:** `openclaw config set gateway.bind lan` in init container.
+
+### Hardcoded port 18789 :bulb:
+
+**Priority rank: #17**
+
+Port 18789 is hardcoded. The standard `PORT` env var is ignored. We initially set `PORT=8000` and `containerPort: 8000` — working pod, no reachable service. Found the real port via `/proc/net/tcp` inside the container.
+
+**Why it's obvious (in hindsight):** Non-standard ports are common in agent frameworks. Always check what the process actually listens on.
+
+**Fix:** Match all manifests (Service, Route, containerPort) to 18789.
+
+### Gateway token regenerates on every restart :bulb:
+
+**Priority rank: #19**
+
+OpenClaw generates a gateway auth token on first boot, writes to `openclaw.json`. The `emptyDir` volume is ephemeral — every pod restart = new token. Dashboard needs re-pairing.
+
+**Fix:** `make token` + `make approve-pairing` after restarts. A PVC would persist state but adds complexity.
+
+### Device pairing required after every reconnect :bulb:
+
+**Priority rank: #20**
+
+OpenClaw's Control UI uses a device pairing model (like messaging apps). New browser sessions register as "devices" needing operator approval. Pairing persists across page refreshes but is lost on pod restart.
+
+**Fix:** `make approve-pairing` or auto-approve in the deploy skill.
