@@ -274,7 +274,7 @@ We hit 35 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, sandboxed co
 
 Deep-dive docs per area:
 - [docs/gotchas-application.md](docs/gotchas-application.md)
-- [docs/gotchas-platform.md](docs/gotchas-platform.md)
+- [docs/gotchas-platform-kagenti.md](docs/gotchas-platform-kagenti.md)
 - [docs/gotchas-nemo-guardrails.md](docs/gotchas-nemo-guardrails.md)
 - [docs/gotchas-mlflow-tracing.md](docs/gotchas-mlflow-tracing.md)
 - [docs/gotchas-sandboxed-containers.md](docs/gotchas-sandboxed-containers.md)

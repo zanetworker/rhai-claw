@@ -34,7 +34,7 @@ Owner: Kagenti operator + kagenti-extensions
 | AgentCards CRD only from Helm first-install | Manual deletion requires full Helm reinstall to recover | Document: don't delete CRDs |
 | Empty secrets cause silent failures | `$ANTHROPIC_API_KEY` unset creates empty secret, agent says "No API key" | Workaround: skill verifies secret content length |
 
-Full details: [gotchas-platform.md](gotchas-platform.md)
+Full details: [gotchas-platform-kagenti.md](gotchas-platform-kagenti.md)
 
 ## TrustyAI / Safety Team
 
