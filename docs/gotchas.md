@@ -43,7 +43,7 @@ The top gotchas across all teams, ranked by how likely they are to block you and
 | 25 | :bulb: | [Kagenti](#kagenti--platform-team) | [AgentCard SYNCED=False for non-A2A agents](gotchas-platform-kagenti.md#agentcard-syncedfalse-for-non-a2a-agents-bulb) | 15 min — ConfigMap pattern |
 | 26 | :bulb: | [Kagenti](#kagenti--platform-team) | [Deployment name mismatch in webhook](gotchas-platform-kagenti.md#deployment-name-mismatch-in-webhook-bulb) | Patched in fork |
 | 27 | :bulb: | [Kagenti](#kagenti--platform-team) | [AgentCards CRD only from Helm first-install](gotchas-platform-kagenti.md#agentcards-crd-only-from-helm-first-install-bulb) | Avoid deleting CRDs |
-| 28 | :no_entry: | [Sandboxed Containers](#openshift-sandboxed-containers--security-team) | [4,000 sandboxed pods impractical](gotchas-sandboxed-containers.md#6-scaling-sandboxed-pods-is-impractical) | Design constraint, not a bug |
+| 28 | :no_entry: | [Sandboxed Containers](#openshift-sandboxed-containers--security-team) | [Hundreds of sandboxed agents impractical](gotchas-sandboxed-containers.md#6-scaling-sandboxed-pods-is-impractical) | Design constraint, not a bug |
 | 29 | :no_entry: | [MLflow](#mlflow--observability-team) | [Traces are HTTP-level only, not GenAI-level](gotchas-mlflow-tracing.md#current-state-http-level-traces-only-no_entry) | Architectural gap — see 3 paths |
 | 30 | :no_entry: | [TrustyAI / NeMo](#trustyai--safety-team) | [`NemoGuardrail` CRD can't add sidecars or command overrides](gotchas-nemo-guardrails.md#6-nemoguardrail-crd-doesnt-support-custom-commands-no_entry) | Blocks CRD-based deployment |
 | 31 | :no_entry: | [OpenClaw](#openclaw--agent-team) | [`diagnostics-otel` extension broken in image](gotchas-application.md#diagnostics-otel-extension-broken-in-image-no_entry) | Blocks GenAI traces via Path 1 |
@@ -127,7 +127,7 @@ Owner: OpenShift sandboxed containers operator team
 | # | Severity | Gotcha | Impact |
 |---|----------|--------|--------|
 | 1 | :no_entry: | Native Kata doesn't work on AWS cloud VMs | Must use peer pods or bare metal |
-| 28 | :no_entry: | 4,000 sandboxed pods impractical | Design constraint |
+| 28 | :no_entry: | Hundreds of sandboxed agents impractical | Design constraint |
 | 6 | :warning: | Port 15150 not open — peer pod unreachable | Dead end without SG access |
 | 8 | :warning: | Pod VM AMI creation fails on S3/IAM | No retry, fragile auto-provisioning |
 | 9 | :warning: | `peer-pods-cm` must exist before KataConfig | No reconciliation, costs a reboot to fix |

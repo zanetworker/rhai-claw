@@ -29,9 +29,9 @@ Want VM-level pod isolation?
 │   │           └── Bare metal instances (m5.metal, ~$4.6/hr)
 │   │               Real KVM, native Kata works. Expensive.
 │   │
-│   └── At scale (hundreds/thousands of pods)?
+│   └── At scale (hundreds of agents)?
 │       └── DEAD END — see #6
-│           ~350 MiB overhead per VM, or 1 EC2 instance per pod
+│           ~350 MiB overhead per VM, or 1 EC2 instance per agent
 │           Use NetworkPolicy + guardrails instead
 │
 └── No → Skip sandboxed containers entirely
@@ -87,20 +87,20 @@ spec:
 
 Create a dedicated MachineSet for sandbox nodes. Only those nodes reboot. Production workloads continue.
 
-### 6. Scaling sandboxed pods is impractical
+### 6. Scaling to hundreds of sandboxed agents is impractical
 
 **Severity: Obvious / Dead end at scale**
 
-| Mode | Overhead per pod | 4,000 pods |
-|------|-----------------|------------|
-| Native Kata | ~350 MiB RAM + 250m CPU | 1.4 TiB RAM, 1,000 vCPUs just for overhead |
-| Peer pods | 1 EC2 instance per pod | 4,000 instances at ~$0.04/hr = $160/hr |
+| Mode | Overhead per agent | 100 agents | 500 agents |
+|------|-------------------|------------|------------|
+| Native Kata | ~350 MiB RAM + 250m CPU | 35 GiB RAM, 25 vCPUs overhead | 175 GiB RAM, 125 vCPUs overhead |
+| Peer pods | 1 EC2 instance per agent | 100 EC2 instances (~$4/hr) | 500 EC2 instances (~$20/hr) |
 
 Benchmarks show native Kata maxes at ~134 containers per node vs ~377 for standard runc.
 
-**Why it's "obvious":** Each pod = a VM. VMs have overhead. This is the fundamental tradeoff of VM-level isolation.
+**Why it's "obvious":** Each agent = a VM. VMs have overhead. This is the fundamental tradeoff of VM-level isolation.
 
-**Recommendation:** Use Kata on a few demo pods. Use NetworkPolicy + NeMo Guardrails for the bulk.
+**Recommendation:** Use Kata on a few demo agents. Use NetworkPolicy + NeMo Guardrails for the bulk.
 
 ## Surprising Gotchas
 
