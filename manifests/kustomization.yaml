@@ -10,5 +10,6 @@ resources:
 - agentcard-configmap.yaml
 - otel-tracing-configmap.yaml
 - guardrails-config.yaml
-- guardrails-deployment.yaml
-- guardrails-service.yaml
+- guardrails-adapter.yaml
+# guardrails-deployment.yaml — standalone mode (use if Anthropic engine needed, CRD can't pip install)
+# For product stack: use NemoGuardrails CR instead (step 14 in deploy skill)

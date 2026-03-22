@@ -274,8 +274,41 @@ kubectl patch deploy openclaw -n <NAMESPACE> --type=json -p "[
 
 If no MLflow, skip this step.
 
-### 13. Add API key to deployment
+### 13. Set up LLM API keys on deployment
 
+Ask the user which LLM provider they want to use for guardrails evaluation. Default: OpenAI (`gpt-4o-mini`).
+
+**OpenAI (recommended — works with RHOAI NeMo image out of the box):**
+```bash
+kubectl patch deploy openclaw -n <NAMESPACE> --type=json -p '[
+  {"op":"add","path":"/spec/template/spec/containers/0/env/-","value":{
+    "name":"OPENAI_API_KEY",
+    "valueFrom":{"secretKeyRef":{"name":"llm-keys","key":"openai"}}
+  }}
+]'
+```
+
+Verify the `llm-keys` secret has an `openai` key:
+```bash
+kubectl get secret llm-keys -n <NAMESPACE> -o jsonpath='{.data.openai}' | wc -c
+```
+
+If missing, tell the user to add it:
+```bash
+kubectl patch secret llm-keys -n <NAMESPACE> --type=json -p '[{"op":"add","path":"/data/openai","value":"'$(echo -n $OPENAI_API_KEY | base64)'"}]'
+```
+
+**Anthropic (requires workaround — see gotcha #4):**
+
+> **Note:** The RHOAI NeMo Guardrails image does not ship `langchain-anthropic`. Using `engine: anthropic` in the NeMo config requires either:
+> - Pip installing `langchain-anthropic` at pod startup (standalone deployment, not CRD) — adds ~15s startup
+> - Waiting for the TrustyAI team to add the package to the image
+>
+> The `engine: anthropic` code path in NeMo uses `langchain-anthropic` → Anthropic Python SDK → Anthropic Messages API (`/v1/messages`). This is a different protocol from OpenAI chat completions (`/v1/chat/completions`). The package is the only blocker — the code works.
+>
+> If Anthropic is required, use the standalone deployment in `manifests/guardrails-deployment.yaml` instead of the NemoGuardrails CRD.
+
+Also add the Anthropic key if needed for OpenClaw's direct use:
 ```bash
 kubectl patch deploy openclaw -n <NAMESPACE> --type=json -p '[
   {"op":"add","path":"/spec/template/spec/containers/0/env/-","value":{
@@ -285,30 +318,60 @@ kubectl patch deploy openclaw -n <NAMESPACE> --type=json -p '[
 ]'
 ```
 
-### 14. Deploy NeMo Guardrails
+### 14. Deploy NeMo Guardrails via TrustyAI operator
 
-Deploy the guardrails service that enforces enterprise safety policies on all LLM calls.
+Deploy guardrails using the product stack — the TrustyAI `NemoGuardrails` CRD manages the NeMo pod lifecycle.
 
+First, apply the guardrails Colang config:
 ```bash
 kubectl apply -f manifests/guardrails-config.yaml -n <NAMESPACE>
-kubectl apply -f manifests/guardrails-deployment.yaml -n <NAMESPACE>
-kubectl apply -f manifests/guardrails-service.yaml -n <NAMESPACE>
 ```
 
-Wait for the guardrails pod (takes ~60s — NeMo starts + pip installs `langchain-anthropic`):
+Then create the `NemoGuardrails` CR:
 ```bash
-kubectl wait --for=condition=available deployment/openclaw-guardrails -n <NAMESPACE> --timeout=180s
+kubectl apply -n <NAMESPACE> -f - <<'EOF'
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: NemoGuardrails
+metadata:
+  name: openclaw-guardrails
+spec:
+  env:
+    - name: OPENAI_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: llm-keys
+          key: openai
+  nemoConfigs:
+    - name: openclaw-safety
+      default: true
+      configMaps:
+        - openclaw-guardrails-config
+EOF
 ```
 
-Verify it's healthy:
+Wait for the CRD-managed pod:
 ```bash
-kubectl exec -n <NAMESPACE> deploy/openclaw-guardrails -c openai-adapter -- \
-  python3 -c "import urllib.request,json; r=urllib.request.urlopen('http://localhost:8080/'); print(json.loads(r.read()))"
+kubectl wait --for=condition=available deployment/openclaw-guardrails -n <NAMESPACE> --timeout=120s
 ```
 
-### 15. Configure OpenClaw to route through guardrails
+### 15. Deploy the OpenAI format adapter
 
-Create a ConfigMap with the guardrails provider batch config:
+The NeMo server has three known issues that require an adapter (see gotchas #1-3):
+- Returns `{"messages": [...]}` instead of OpenAI `{"choices": [...]}` format
+- Crashes on multi-part `content: [...]` (list format) from OpenClaw
+- Ignores `stream: true` — clients expecting SSE hang
+
+Deploy the adapter as a separate service that proxies to the CRD-managed NeMo service:
+```bash
+kubectl apply -f manifests/guardrails-adapter.yaml -n <NAMESPACE>
+kubectl wait --for=condition=available deployment/openclaw-guardrails-adapter -n <NAMESPACE> --timeout=60s
+```
+
+The adapter normalizes content, converts response format, and adds SSE streaming. OpenClaw talks to `openclaw-guardrails-proxy` (the adapter), not `openclaw-guardrails` (NeMo directly).
+
+### 16. Configure OpenClaw to route through guardrails
+
+Create the batch config pointing at the adapter service:
 ```bash
 kubectl apply -n <NAMESPACE> -f - <<'EOF'
 apiVersion: v1
@@ -321,17 +384,17 @@ data:
       {
         "path": "models.providers.guardrails-proxy",
         "value": {
-          "baseUrl": "http://openclaw-guardrails.<NAMESPACE>.svc.cluster.local/v1",
-          "apiKey": "${ANTHROPIC_API_KEY}",
+          "baseUrl": "http://openclaw-guardrails-proxy.<NAMESPACE>.svc.cluster.local/v1",
+          "apiKey": "${OPENAI_API_KEY}",
           "api": "openai-completions",
           "models": [
-            { "id": "claude-sonnet-4-20250514", "name": "Claude Sonnet via Guardrails" }
+            { "id": "gpt-4o-mini", "name": "GPT-4o-mini via Guardrails" }
           ]
         }
       },
       {
         "path": "agents.defaults.model.primary",
-        "value": "guardrails-proxy/claude-sonnet-4-20250514"
+        "value": "guardrails-proxy/gpt-4o-mini"
       }
     ]
 EOF
@@ -360,7 +423,7 @@ kubectl patch deployment openclaw -n <NAMESPACE> --type='json' -p='[
 ]'
 ```
 
-### 16. Wait for pod ready
+### 17. Wait for pod ready
 
 ```bash
 kubectl wait --for=condition=available deployment/openclaw -n <NAMESPACE> --timeout=120s
@@ -371,7 +434,7 @@ Verify the guardrails proxy is configured:
 kubectl exec -n <NAMESPACE> deploy/openclaw -c agent -- openclaw config get agents.defaults.model.primary 2>/dev/null | grep -v otel
 ```
 
-Should output: `guardrails-proxy/claude-sonnet-4-20250514`
+Should output: `guardrails-proxy/gpt-4o-mini`
 
 ### 18. Retrieve gateway token and URL
 
