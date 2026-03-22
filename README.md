@@ -260,7 +260,7 @@ OpenClaw connects to the guardrails proxy via a custom model provider in `opencl
 
 ## Gotchas by Team
 
-We hit 35 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, sandboxed containers, and MLflow tracing. The `/deploy-openclaw` skill handles most of them automatically. Each team has its own section with impact and status:
+We hit 36 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, sandboxed containers, and MLflow tracing. The `/deploy-openclaw` skill handles most of them automatically. Each team has its own section with impact and status:
 
 **[docs/gotchas.md](docs/gotchas.md)** — the full index with tables per team:
 

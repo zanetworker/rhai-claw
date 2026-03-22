@@ -116,6 +116,45 @@ Also changed the `instructions` from "You are a safety guardrail" (which caused 
 
 **What should be fixed:** The default self-check prompts should be resilient to common message envelope patterns. Agent frameworks routinely add metadata/context to messages. The self-check should evaluate the user's intent, not the transport metadata.
 
+### 7. NeMo Guardrails depends on LangChain for LLM access :warning:
+
+**Priority rank: NEW**
+
+NeMo Guardrails doesn't call LLM APIs directly. It uses LangChain as its LLM abstraction layer. The `engine` field in `config.yaml` maps to a specific `langchain-*` Python package:
+
+| `engine` | Package required | Shipped in RHOAI image? |
+|----------|-----------------|------------------------|
+| `openai` | `langchain-openai` | Yes |
+| `anthropic` | `langchain-anthropic` | No |
+| `google` | `langchain-google-genai` | No |
+| `nim` | `langchain-nvidia-ai-endpoints` | Yes |
+
+This is a hidden dependency chain: NeMo → LangChain → provider-specific LangChain package → provider SDK → API.
+
+**Why it matters:**
+
+1. **Provider lock-in through packaging.** The RHOAI image only ships `langchain-openai` and `langchain-nvidia-ai-endpoints`. Want to use Anthropic or Google? Pip install at runtime or rebuild the image. This limits which models can be used for guardrail evaluation.
+
+2. **LangChain is a heavy dependency.** It pulls in dozens of sub-packages, has frequent breaking changes between versions, and adds complexity to debugging. When something fails in the guardrails → LangChain → provider SDK chain, the stack traces are deep and hard to follow.
+
+3. **Red Hat ships Llama Stack as the inference abstraction.** If NeMo used Llama Stack's `/v1/chat/completions` (OpenAI-compatible) endpoint directly instead of LangChain, it would work with any model served by Llama Stack — vLLM, TGI, Ollama, remote providers — without needing provider-specific packages.
+
+**Alternatives to explore:**
+
+| Approach | What changes | Benefit |
+|----------|-------------|---------|
+| **NeMo + Llama Stack inference** | Point NeMo's `engine: openai` at a Llama Stack endpoint | Any model Llama Stack serves becomes available for guardrail evaluation. No LangChain provider packages needed. |
+| **NeMo + vLLM directly** | Point `engine: openai` at vLLM's OpenAI-compatible endpoint | Self-hosted model for guardrail checks. No external API calls. |
+| **Replace NeMo with Guardrails Orchestrator** | Use the IBM FMS-based `GuardrailsOrchestrator` CRD instead of NeMo | Different architecture (detector-based, not LLM-as-judge). Uses Granite Guardian models via KServe. No LangChain dependency. |
+| **NeMo drops LangChain** | NeMo calls OpenAI-compatible APIs directly via `httpx`/`requests` | Eliminates the LangChain layer entirely. Any OpenAI-compatible endpoint works. |
+
+**What to validate:**
+- Can NeMo Guardrails with `engine: openai` point at a Llama Stack endpoint? (Should work — both speak OpenAI chat completions format)
+- Does the Guardrails Orchestrator CRD cover the same use cases as NeMo? (Different model — detectors vs conversational rails)
+- What's the quality delta between GPT-4o-mini and a self-hosted Llama/Granite model for safety self-checks?
+
+**Workaround:** Use `engine: openai` with GPT-4o-mini (works with the RHOAI image). Or `engine: openai` pointed at any OpenAI-compatible endpoint (vLLM, Llama Stack, LiteLLM).
+
 ## Dead Ends
 
 ### 6. `NemoGuardrail` CRD doesn't support custom commands :no_entry:
