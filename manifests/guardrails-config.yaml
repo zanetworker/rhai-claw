@@ -8,9 +8,9 @@ data:
     models:
       - type: main
         engine: openai
-        model: llama3-2-8b
+        model: openai-hosted/gpt-4o-mini
         parameters:
-          openai_api_base: https://llama3-2-8b-test.apps.cluster-nrpwk.nrpwk.sandbox2474.opentlc.com/v1
+          openai_api_base: http://lsd-genai-playground-service.test.svc.cluster.local:8321/v1
           openai_api_key: none
 
     rails:

@@ -95,6 +95,85 @@ curl -sk https://<vllm-route>/v1/models | jq '.data[0].id'
 
 The model ID must exactly match what vLLM serves — it's the `id` field from `/v1/models`, not the HuggingFace model name.
 
+## Configuring Llama Stack as Universal Inference Gateway
+
+Llama Stack can serve as the single inference endpoint for NeMo Guardrails, routing to either self-hosted models (vLLM) or remote providers (OpenAI) through the same API. NeMo doesn't know which backend is active — it just talks `/v1/chat/completions`.
+
+### What we changed
+
+The default `LlamaStackDistribution` config only has a `remote::vllm` provider. To add OpenAI:
+
+**1. Add `remote::openai` provider to `llama-stack-config` ConfigMap:**
+
+```yaml
+providers:
+  inference:
+    # Existing vLLM provider (self-hosted)
+    - provider_id: vllm-inference-1
+      provider_type: remote::vllm
+      config:
+        base_url: http://llama3-2-8b-predictor.test.svc.cluster.local:8080/v1
+        api_token: fake
+        max_tokens: 4096
+
+    # New: OpenAI provider (remote/hosted)
+    - provider_id: openai-hosted
+      provider_type: remote::openai
+      config:
+        api_key: ${env.OPENAI_API_KEY}
+```
+
+**2. Add `OPENAI_API_KEY` env var to the Llama Stack deployment:**
+
+```bash
+# Create secret in the Llama Stack namespace
+oc create secret generic llm-keys -n <LS_NAMESPACE> --from-literal=openai=$OPENAI_API_KEY
+
+# Patch the deployment
+oc patch deployment <LSD_NAME> -n <LS_NAMESPACE> --type=json -p '[
+  {"op":"add","path":"/spec/template/spec/containers/0/env/-","value":{
+    "name":"OPENAI_API_KEY",
+    "valueFrom":{"secretKeyRef":{"name":"llm-keys","key":"openai"}}
+  }}
+]'
+```
+
+**3. Llama Stack auto-discovers all OpenAI models** — no manual registration needed. After restart, `/v1/models` returns both:
+
+| Model ID | Provider | Backend |
+|----------|----------|---------|
+| `vllm-inference-1/llama3-2-8b` | `remote::vllm` | Self-hosted GPU |
+| `openai-hosted/gpt-4o-mini` | `remote::openai` | OpenAI API |
+
+**4. Point NeMo Guardrails at Llama Stack:**
+
+```yaml
+# guardrails config.yaml
+models:
+  - type: main
+    engine: openai
+    model: openai-hosted/gpt-4o-mini     # or vllm-inference-1/llama3-2-8b
+    parameters:
+      openai_api_base: http://lsd-genai-playground-service.<LS_NAMESPACE>.svc.cluster.local:8321/v1
+      openai_api_key: none
+```
+
+### Switching between backends
+
+To switch NeMo from OpenAI to self-hosted, change one line in the guardrails config:
+
+```yaml
+# Remote (OpenAI via Llama Stack)
+model: openai-hosted/gpt-4o-mini
+
+# Self-hosted (vLLM via Llama Stack)
+model: vllm-inference-1/llama3-2-8b
+```
+
+Same Llama Stack endpoint, same API, different backend. Restart the NeMo pod to pick up the change.
+
+**Caveat:** Self-hosted models must be 8B+ for guardrail self-checks to work (see gotcha #1 above). The 3B model on this cluster silently fails to evaluate safety rails.
+
 ## Recommended Setup
 
 For self-hosted guardrail evaluation that actually works:
