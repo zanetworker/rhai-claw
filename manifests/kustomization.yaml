@@ -9,3 +9,6 @@ resources:
 - agentruntime.yaml
 - agentcard-configmap.yaml
 - otel-tracing-configmap.yaml
+- guardrails-config.yaml
+- guardrails-deployment.yaml
+- guardrails-service.yaml

@@ -285,13 +285,95 @@ kubectl patch deploy openclaw -n <NAMESPACE> --type=json -p '[
 ]'
 ```
 
-### 14. Wait for pod ready
+### 14. Deploy NeMo Guardrails
+
+Deploy the guardrails service that enforces enterprise safety policies on all LLM calls.
+
+```bash
+kubectl apply -f manifests/guardrails-config.yaml -n <NAMESPACE>
+kubectl apply -f manifests/guardrails-deployment.yaml -n <NAMESPACE>
+kubectl apply -f manifests/guardrails-service.yaml -n <NAMESPACE>
+```
+
+Wait for the guardrails pod (takes ~60s — NeMo starts + pip installs `langchain-anthropic`):
+```bash
+kubectl wait --for=condition=available deployment/openclaw-guardrails -n <NAMESPACE> --timeout=180s
+```
+
+Verify it's healthy:
+```bash
+kubectl exec -n <NAMESPACE> deploy/openclaw-guardrails -c openai-adapter -- \
+  python3 -c "import urllib.request,json; r=urllib.request.urlopen('http://localhost:8080/'); print(json.loads(r.read()))"
+```
+
+### 15. Configure OpenClaw to route through guardrails
+
+Create a ConfigMap with the guardrails provider batch config:
+```bash
+kubectl apply -n <NAMESPACE> -f - <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openclaw-guardrails-batch
+data:
+  guardrails-config.json: |
+    [
+      {
+        "path": "models.providers.guardrails-proxy",
+        "value": {
+          "baseUrl": "http://openclaw-guardrails.<NAMESPACE>.svc.cluster.local/v1",
+          "apiKey": "${ANTHROPIC_API_KEY}",
+          "api": "openai-completions",
+          "models": [
+            { "id": "claude-sonnet-4-20250514", "name": "Claude Sonnet via Guardrails" }
+          ]
+        }
+      },
+      {
+        "path": "agents.defaults.model.primary",
+        "value": "guardrails-proxy/claude-sonnet-4-20250514"
+      }
+    ]
+EOF
+```
+
+**IMPORTANT:** Replace `<NAMESPACE>` with the actual namespace in the `baseUrl`.
+
+Patch the OpenClaw init container to apply the guardrails config on every pod start:
+```bash
+kubectl patch deployment openclaw -n <NAMESPACE> --type='json' -p='[
+  {
+    "op": "replace",
+    "path": "/spec/template/spec/initContainers/0/command",
+    "value": ["sh", "-c", "openclaw config set gateway.bind lan && openclaw config set gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback true && openclaw config set diagnostics.enabled true && openclaw config set --batch-file /tmp/guardrails-config.json --strict-json"]
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/initContainers/0/volumeMounts/-",
+    "value": {"name": "guardrails-batch-config", "mountPath": "/tmp/guardrails-config.json", "subPath": "guardrails-config.json"}
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/volumes/-",
+    "value": {"name": "guardrails-batch-config", "configMap": {"name": "openclaw-guardrails-batch"}}
+  }
+]'
+```
+
+### 16. Wait for pod ready
 
 ```bash
 kubectl wait --for=condition=available deployment/openclaw -n <NAMESPACE> --timeout=120s
 ```
 
-### 15. Retrieve gateway token and URL
+Verify the guardrails proxy is configured:
+```bash
+kubectl exec -n <NAMESPACE> deploy/openclaw -c agent -- openclaw config get agents.defaults.model.primary 2>/dev/null | grep -v otel
+```
+
+Should output: `guardrails-proxy/claude-sonnet-4-20250514`
+
+### 18. Retrieve gateway token and URL
 
 Wait 5 seconds, then:
 ```bash
@@ -306,7 +388,7 @@ kubectl get route openclaw -n <NAMESPACE> -o jsonpath='https://{.spec.host}'
 
 If no route (non-OpenShift), suggest: `kubectl port-forward svc/openclaw -n <NAMESPACE> 18789:18789`
 
-### 16. Approve device pairing
+### 19. Approve device pairing
 
 Tell the user the dashboard URL and gateway token. After they connect and see "pairing required," approve it:
 ```bash
@@ -314,7 +396,7 @@ kubectl exec -n <NAMESPACE> deploy/openclaw -c agent -- sh -c \
   'ID=$(openclaw devices list 2>/dev/null | grep "│" | grep -v "Request\|──" | head -1 | awk "{print \$2}"); openclaw devices approve $ID 2>/dev/null'
 ```
 
-### 17. Report results
+### 20. Report results
 
 ```bash
 echo "=== Dashboard ==="

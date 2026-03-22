@@ -1,0 +1,211 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openclaw-guardrails
+  namespace: openclaw
+  labels:
+    app: openclaw-guardrails
+    app.kubernetes.io/name: openclaw-guardrails
+    app.kubernetes.io/part-of: openclaw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openclaw-guardrails
+  template:
+    metadata:
+      labels:
+        app: openclaw-guardrails
+    spec:
+      containers:
+        - name: nemo-guardrails
+          image: quay.io/trustyai/nemo-guardrails-server:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Installing langchain-anthropic..."
+              /app/.venv/bin/pip install --no-cache-dir langchain-anthropic 2>&1 | tail -3
+              echo "Starting NeMo Guardrails..."
+              CONFIG_ID="${CONFIG_ID:-openclaw-safety}"
+              PORT="${PORT:-8000}"
+              CONFIG_DIR="/app/config/${CONFIG_ID}"
+              echo "Config dir: $CONFIG_DIR"
+              ls -la "$CONFIG_DIR/"
+              exec /app/.venv/bin/nemoguardrails server \
+                --config "/app/config" \
+                --port "$PORT" \
+                --default-config-id "$CONFIG_ID" \
+                --disable-chat-ui
+          env:
+            - name: CONFIG_ID
+              value: openclaw-safety
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llm-keys
+                  key: anthropic
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+              scheme: HTTP
+            initialDelaySeconds: 60
+            timeoutSeconds: 10
+            periodSeconds: 20
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+              scheme: HTTP
+            initialDelaySeconds: 90
+            timeoutSeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: guardrails-config
+              mountPath: /app/config/openclaw-safety
+        - name: openai-adapter
+          image: python:3.12-slim
+          command:
+            - python3
+            - -c
+            - |
+              import http.server, json, urllib.request, uuid, time, sys, threading
+
+              UPSTREAM = "http://localhost:8000"
+
+              class Adapter(http.server.ThreadingHTTPServer if hasattr(http.server,'ThreadingHTTPServer') else http.server.HTTPServer):
+                  pass
+
+              class Handler(http.server.BaseHTTPRequestHandler):
+                  def log_message(self, fmt, *args):
+                      print(f"[adapter] {fmt % args}", flush=True)
+
+                  def do_GET(self):
+                      if self.path == "/v1/models":
+                          body = json.dumps({"object":"list","data":[{"id":"claude-sonnet-4-20250514","object":"model","owned_by":"guardrails-proxy"}]})
+                          self.send_response(200)
+                          self.send_header("Content-Type","application/json")
+                          self.end_headers()
+                          self.wfile.write(body.encode())
+                          return
+                      try:
+                          r = urllib.request.urlopen(f"{UPSTREAM}/")
+                          self.send_response(r.status)
+                          self.send_header("Content-Type","application/json")
+                          self.end_headers()
+                          self.wfile.write(r.read())
+                      except Exception as e:
+                          self.send_response(503)
+                          self.end_headers()
+                          self.wfile.write(json.dumps({"error":str(e)}).encode())
+
+                  def do_POST(self):
+                      length = int(self.headers.get("Content-Length", 0))
+                      raw_body = self.rfile.read(length)
+                      try:
+                          req_json = json.loads(raw_body)
+                      except:
+                          req_json = {}
+                      is_stream = req_json.get("stream", False)
+                      # Strip stream flag before forwarding — NeMo doesn't support it
+                      req_json.pop("stream", None)
+                      # Normalize message content: OpenClaw sends list format, NeMo expects string
+                      for msg in req_json.get("messages", []):
+                          c = msg.get("content")
+                          if isinstance(c, list):
+                              parts = []
+                              for p in c:
+                                  if isinstance(p, dict):
+                                      parts.append(p.get("text", ""))
+                                  elif isinstance(p, str):
+                                      parts.append(p)
+                              msg["content"] = "\n".join(parts)
+                      fwd_body = json.dumps(req_json).encode()
+                      print(f"[adapter] POST stream={is_stream} model={req_json.get('model','?')}", flush=True)
+                      try:
+                          req = urllib.request.Request(
+                              f"{UPSTREAM}/v1/chat/completions",
+                              data=fwd_body,
+                              headers={"Content-Type":"application/json"},
+                              method="POST"
+                          )
+                          with urllib.request.urlopen(req, timeout=120) as resp:
+                              nemo_resp = json.loads(resp.read())
+                          content = ""
+                          if "messages" in nemo_resp and nemo_resp["messages"]:
+                              content = nemo_resp["messages"][0].get("content","")
+                          elif "choices" in nemo_resp:
+                              content = nemo_resp["choices"][0]["message"]["content"]
+                          cmpl_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
+                          if is_stream:
+                              # Return as SSE stream
+                              self.send_response(200)
+                              self.send_header("Content-Type","text/event-stream")
+                              self.send_header("Cache-Control","no-cache")
+                              self.send_header("Connection","close")
+                              self.end_headers()
+                              # Send content as a single chunk delta
+                              chunk = {"id":cmpl_id,"object":"chat.completion.chunk","created":int(time.time()),"model":"claude-sonnet-4-20250514","choices":[{"index":0,"delta":{"role":"assistant","content":content},"finish_reason":None}]}
+                              self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode())
+                              self.wfile.flush()
+                              # Send finish chunk
+                              done_chunk = {"id":cmpl_id,"object":"chat.completion.chunk","created":int(time.time()),"model":"claude-sonnet-4-20250514","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+                              self.wfile.write(f"data: {json.dumps(done_chunk)}\n\n".encode())
+                              self.wfile.write(b"data: [DONE]\n\n")
+                              self.wfile.flush()
+                          else:
+                              openai_resp = {
+                                  "id": cmpl_id,
+                                  "object": "chat.completion",
+                                  "created": int(time.time()),
+                                  "model": "claude-sonnet-4-20250514",
+                                  "choices": [{"index":0,"message":{"role":"assistant","content":content},"finish_reason":"stop"}],
+                                  "usage": {"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}
+                              }
+                              out = json.dumps(openai_resp)
+                              self.send_response(200)
+                              self.send_header("Content-Type","application/json")
+                              self.end_headers()
+                              self.wfile.write(out.encode())
+                      except Exception as e:
+                          self.send_response(502)
+                          self.send_header("Content-Type","application/json")
+                          self.end_headers()
+                          self.wfile.write(json.dumps({"error":{"message":str(e),"type":"proxy_error"}}).encode())
+                          print(f"[adapter] ERROR: {e}", flush=True)
+
+              print("[adapter] Starting OpenAI format adapter on :8080 (streaming supported)", flush=True)
+              Adapter(("0.0.0.0", 8080), Handler).serve_forever()
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: guardrails-config
+          configMap:
+            name: openclaw-guardrails-config

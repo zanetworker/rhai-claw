@@ -6,6 +6,20 @@ OpenClaw, ZeroClaw, a custom LangGraph agent, a CrewAI crew, something you built
 
 This repo is the companion to [Operationalizing "Bring Your Own Agent" on Red Hat AI, the OpenClaw edition](https://www.redhat.com/en/blog/operationalizing-bring-your-own-agent-red-hat-ai-openclaw-edition). It takes [OpenClaw](https://github.com/openclaw/openclaw) — a personal AI assistant that routes agent interactions across channels (WhatsApp, Telegram, Slack, Discord) — and operationalizes it on Kubernetes with [Kagenti](https://github.com/kagenti/kagenti-operator). OpenClaw is the example. The pattern works for any agent runtime.
 
+## Table of Contents
+
+- [The BYOA Principle](#the-byoa-principle)
+- [Quick Start](#quick-start)
+- [What Gets Deployed](#what-gets-deployed)
+- [After Deployment](#after-deployment)
+- [How the AgentCard Gets Its Data](#how-the-agentcard-gets-its-data)
+- [Configuration](#configuration)
+- [NeMo Guardrails Integration](#nemo-guardrails-integration)
+- [Gotchas by Team](#gotchas-by-team)
+- [AgentRuntime Controller](#agentruntime-controller)
+- [Webhook Changes (not yet upstream)](#webhook-changes-not-yet-upstream)
+- [Related Projects](#related-projects)
+
 ## The BYOA Principle
 
 One agent, one pod. The developer deploys a standard container. The platform wraps it in infrastructure.
@@ -193,12 +207,75 @@ After `make deploy`, open the printed dashboard URL. Paste the gateway token, cl
 - Patches the Deployment with the API key reference and OTEL env vars
 - Retrieves the gateway token and approves device pairing
 
-## FYI: Gotchas
+## NeMo Guardrails Integration
 
-Things we hit deploying OpenClaw on Kagenti. The `/deploy-openclaw` skill handles all of them automatically — these are documented for understanding, not for manual steps.
+OpenClaw routes all LLM calls through [NVIDIA NeMo Guardrails](https://github.com/NVIDIA-NeMo/Guardrails) for enterprise safety enforcement. The guardrails sit as a proxy between OpenClaw and the LLM, applying input/output rails on every request.
 
-- [**Application gotchas**](docs/gotchas-application.md) — OpenClaw-specific: loopback binding, non-standard port, token regeneration, device pairing, missing Chrome
-- [**Platform gotchas**](docs/gotchas-platform.md) — Kagenti-specific: namespace labels, AgentCard sync, trace injection gaps, MLflow DNS rebinding, OTEL instrumentation level
+```
+User ──▶ OpenClaw ──▶ OpenAI Adapter ──▶ NeMo Guardrails ──▶ Anthropic API
+                      (format bridge)    (Colang v1 rails)    (actual LLM)
+```
+
+**What gets blocked:**
+- Profanity, hate speech, NSFW content
+- Environment variable / API key extraction attempts
+- Data exfiltration to external endpoints
+- Bulk data download requests
+- Access to sensitive system files
+
+**What gets allowed:**
+- Normal conversation, greetings, questions
+- Todo items, notes, memory updates
+- Conference schedule queries
+- Drafting emails, brainstorming
+
+The guardrails deployment consists of three pieces:
+
+| Manifest | What it does |
+|----------|-------------|
+| `manifests/guardrails-config.yaml` | ConfigMap with `config.yaml` (model, rails, self-check prompts) + `rails.co` (Colang v1 flow definitions) |
+| `manifests/guardrails-deployment.yaml` | Two-container pod: NeMo Guardrails server + OpenAI format adapter sidecar |
+| `manifests/guardrails-service.yaml` | ClusterIP Service (port 80 → adapter on 8080) |
+
+OpenClaw connects to the guardrails proxy via a custom model provider in `openclaw.json`:
+
+```json
+{
+  "models": {
+    "providers": {
+      "guardrails-proxy": {
+        "baseUrl": "http://openclaw-guardrails.<NAMESPACE>.svc.cluster.local/v1",
+        "api": "openai-completions",
+        "models": [{"id": "claude-sonnet-4-20250514", "name": "Claude via Guardrails"}]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {"primary": "guardrails-proxy/claude-sonnet-4-20250514"}
+    }
+  }
+}
+```
+
+## Gotchas by Team
+
+We hit 28 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, and MLflow tracing. The `/deploy-openclaw` skill handles all of them automatically. Each team has its own section with impact and status:
+
+**[docs/gotchas.md](docs/gotchas.md)** — the full index with tables per team:
+
+| Team | Owner | Count | Details |
+|------|-------|-------|---------|
+| [OpenClaw / Agent](docs/gotchas.md#openclaw--agent-team) | OpenClaw upstream | 7 | Loopback binding, hardcoded port, token regen, broken OTEL extension, multi-part content |
+| [Kagenti / Platform](docs/gotchas.md#kagenti--platform-team) | Kagenti operator + extensions | 9 | Namespace labels, AgentCard sync, trace injection, CRD lifecycle, webhook RBAC |
+| [TrustyAI / Safety](docs/gotchas.md#trustyai--safety-team) | TrustyAI operator + NeMo in RHOAI | 6 | Response format, list content crash, streaming, missing packages, prompt sensitivity |
+| [MLflow / Observability](docs/gotchas.md#mlflow--observability-team) | MLflow operator + OTEL | 6 | HTTP vs GenAI traces, Host header, silent errors, latency attribution |
+
+Deep-dive docs per area:
+- [docs/gotchas-application.md](docs/gotchas-application.md)
+- [docs/gotchas-platform.md](docs/gotchas-platform.md)
+- [docs/gotchas-nemo-guardrails.md](docs/gotchas-nemo-guardrails.md)
+- [docs/gotchas-mlflow-tracing.md](docs/gotchas-mlflow-tracing.md)
 
 ## AgentRuntime Controller
 

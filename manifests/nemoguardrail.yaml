@@ -1,0 +1,20 @@
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: NemoGuardrails
+metadata:
+  name: openclaw-guardrails
+  namespace: openclaw
+  labels:
+    app.kubernetes.io/name: openclaw-guardrails
+    app.kubernetes.io/part-of: openclaw
+spec:
+  nemoConfigs:
+    - name: openclaw-safety
+      default: true
+      configMaps:
+        - openclaw-guardrails-config
+  env:
+    - name: ANTHROPIC_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: llm-keys
+          key: anthropic
