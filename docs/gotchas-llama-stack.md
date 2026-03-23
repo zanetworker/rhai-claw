@@ -95,6 +95,111 @@ curl -sk https://<vllm-route>/v1/models | jq '.data[0].id'
 
 The model ID must exactly match what vLLM serves — it's the `id` field from `/v1/models`, not the HuggingFace model name.
 
+### 4. Don't reuse shared Llama Stack instances — create a dedicated one :warning:
+
+We made this mistake: we modified the `lsd-genai-playground` LlamaStackDistribution (the shared playground instance) to add a `remote::openai` provider. This is wrong — the playground instance is used by other workloads, and adding providers or changing its config affects everyone.
+
+**Correct approach:** Create a **separate** LlamaStackDistribution in the same namespace as your vLLM models. This way:
+- The guardrails Llama Stack instance has its own config, lifecycle, and credentials
+- It can reference the same vLLM InferenceService (same namespace)
+- Switching between `remote::vllm` and `remote::openai` doesn't affect other users
+- You can tear it down without impacting the playground
+
+See the "Deploying a Dedicated Llama Stack Instance" section below for how to do this properly.
+
+## Deploying a Dedicated Llama Stack Instance
+
+Create a separate LlamaStackDistribution for guardrails inference. Deploy it in the same namespace as your vLLM models so it can reach them via internal service.
+
+**1. Create the config ConfigMap:**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llama-stack-guardrails-config
+  namespace: <MODEL_NAMESPACE>    # same ns as your InferenceService
+data:
+  config.yaml: |
+    version: "2"
+    image_name: rh
+    apis:
+      - inference
+    providers:
+      inference:
+        - provider_id: vllm-local
+          provider_type: remote::vllm
+          config:
+            base_url: http://<ISVC_NAME>-predictor.<MODEL_NAMESPACE>.svc.cluster.local:8080/v1
+            api_token: fake
+            max_tokens: 4096
+            tls_verify: false
+        - provider_id: openai-hosted
+          provider_type: remote::openai
+          config:
+            api_key: ${env.OPENAI_API_KEY}
+      safety: []
+    metadata_store:
+      type: sqlite
+      db_path: /opt/app-root/src/.llama/distributions/rh/inference_store.db
+```
+
+**2. Create the LlamaStackDistribution CR:**
+
+```yaml
+apiVersion: llamastack.io/v1alpha1
+kind: LlamaStackDistribution
+metadata:
+  name: lsd-guardrails
+  namespace: <MODEL_NAMESPACE>
+spec:
+  replicas: 1
+  server:
+    containerSpec:
+      env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-keys
+              key: openai
+      name: llama-stack
+      port: 8321
+      resources:
+        requests:
+          cpu: 250m
+          memory: 500Mi
+        limits:
+          cpu: "1"
+          memory: 2Gi
+    distribution:
+      name: rh-dev
+    userConfig:
+      configMapName: llama-stack-guardrails-config
+```
+
+**3. Point NeMo Guardrails at the dedicated instance:**
+
+```yaml
+# guardrails config.yaml
+models:
+  - type: main
+    engine: openai
+    model: openai-hosted/gpt-4o-mini     # or vllm-local/<model-id>
+    parameters:
+      openai_api_base: http://lsd-guardrails-service.<MODEL_NAMESPACE>.svc.cluster.local:8321/v1
+      openai_api_key: none
+```
+
+**Available models through this instance:**
+
+| Model ID | Provider | Backend | Min size for guardrails |
+|----------|----------|---------|------------------------|
+| `vllm-local/<model-id>` | `remote::vllm` | Self-hosted GPU | 8B+ required |
+| `openai-hosted/gpt-4o-mini` | `remote::openai` | OpenAI API | Works well |
+| `openai-hosted/gpt-4o` | `remote::openai` | OpenAI API | Excellent |
+
+Swap between self-hosted and remote by changing the model ID in the guardrails config. Same Llama Stack endpoint, same API.
+
 ## Configuring Llama Stack as Universal Inference Gateway
 
 Llama Stack can serve as the single inference endpoint for NeMo Guardrails, routing to either self-hosted models (vLLM) or remote providers (OpenAI) through the same API. NeMo doesn't know which backend is active — it just talks `/v1/chat/completions`.

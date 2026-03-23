@@ -260,7 +260,7 @@ OpenClaw connects to the guardrails proxy via a custom model provider in `opencl
 
 ## Gotchas by Team
 
-We hit 40 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, sandboxed containers, and MLflow tracing. The `/deploy-openclaw` skill handles most of them automatically. Each team has its own section with impact and status:
+We hit 41 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, sandboxed containers, and MLflow tracing. The `/deploy-openclaw` skill handles most of them automatically. Each team has its own section with impact and status:
 
 **[docs/gotchas.md](docs/gotchas.md)** — the full index with tables per team:
 
@@ -271,7 +271,7 @@ We hit 40 gotchas deploying OpenClaw with Kagenti, NeMo Guardrails, sandboxed co
 | [TrustyAI / Safety](docs/gotchas.md#trustyai--safety-team) | TrustyAI operator + NeMo in RHOAI | 6 | Response format, list content crash, streaming, missing packages, CRD path blocked |
 | [MLflow / Observability](docs/gotchas.md#mlflow--observability-team) | MLflow operator + OTEL | 6 | HTTP vs GenAI traces, Host header, silent errors, latency attribution |
 | [Sandboxed Containers / Security](docs/gotchas.md#openshift-sandboxed-containers--security-team) | Sandboxed containers operator | 7 | No nested virt on AWS, node reboots, AMI creation, SG ports, peer pods config |
-| [Llama Stack / Inference](docs/gotchas.md#llama-stack--inference-team) | Llama Stack operator + vLLM / KServe | 3 | 3B model breaks rails silently, headless service cross-ns, stuck pods |
+| [Llama Stack / Inference](docs/gotchas.md#llama-stack--inference-team) | Llama Stack operator + vLLM / KServe | 4 | 3B model breaks rails silently, headless service cross-ns, stuck pods, don't reuse shared instances |
 
 Deep-dive docs per area:
 - [docs/gotchas-application.md](docs/gotchas-application.md)

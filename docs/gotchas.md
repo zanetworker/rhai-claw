@@ -33,6 +33,7 @@ The top gotchas across all teams, ranked by how likely they are to block you and
 | 38 | :warning: | [Llama Stack / Inference](#llama-stack--inference-team) | [3B model silently breaks safety rails — guardrails are theater](gotchas-llama-stack.md#1-3b-model-silently-breaks-safety-rails--no-errors-no-warnings-warning) | No errors, no warnings, rails just don't work |
 | 39 | :warning: | [Llama Stack / Inference](#llama-stack--inference-team) | [KServe headless service not reachable cross-namespace](gotchas-llama-stack.md#2-kserve-headless-service-not-reachable-from-other-namespaces-warning) | Must use Route instead of internal service |
 | 40 | :bulb: | [Llama Stack / Inference](#llama-stack--inference-team) | [Stuck predictor pods accumulate](gotchas-llama-stack.md#3-multiple-stuck-predictor-pods-accumulate-bulb) | Log tailing attaches to wrong pod |
+| 41 | :warning: | [Llama Stack / Inference](#llama-stack--inference-team) | [Don't reuse shared Llama Stack instances — create a dedicated one](gotchas-llama-stack.md#4-dont-reuse-shared-llama-stack-instances--create-a-dedicated-one-warning) | Modifying playground config affects other users |
 | 13 | :warning: | [OpenClaw](#openclaw--agent-team) | [Multi-part content format breaks downstream tools](gotchas-application.md#multi-part-content-format-breaks-downstream-tools-warning) | 1+ hours — linked to NeMo crash (#2) |
 | 14 | :warning: | [Kagenti](#kagenti--platform-team) | [Webhook early return bypasses trace injection](gotchas-platform-kagenti.md#webhook-early-return-bypasses-trace-injection-warning) | 1 hour — only when sidecars disabled |
 | 15 | :warning: | [Sandboxed Containers](#openshift-sandboxed-containers--security-team) | [KataConfig deletion stuck on finalizer](gotchas-sandboxed-containers.md#5-kataconfig-deletion-stuck-on-finalizer) | 30 min — blocks cluster cleanup |
@@ -154,5 +155,6 @@ Owner: Llama Stack operator + vLLM / KServe
 | 38 | :warning: | 3B model silently breaks safety rails | Guardrails appear to run but block nothing — no errors |
 | 39 | :warning: | KServe headless service not reachable cross-namespace | Must use Route instead of internal service |
 | 40 | :bulb: | Stuck predictor pods accumulate | Log tailing hits wrong pod |
+| 41 | :warning: | Don't reuse shared Llama Stack instances | Modifying playground config affects other users |
 
 Full details: [gotchas-llama-stack.md](gotchas-llama-stack.md)

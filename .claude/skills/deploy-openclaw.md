@@ -318,9 +318,9 @@ kubectl patch deploy openclaw -n <NAMESPACE> --type=json -p '[
 ]'
 ```
 
-### 13b. Detect self-hosted models (Llama Stack / vLLM)
+### 13b. Detect self-hosted models and set up Llama Stack gateway
 
-Check if the cluster has self-hosted models that could be used for guardrail evaluation instead of external APIs:
+Check if the cluster has self-hosted models and Llama Stack:
 
 ```bash
 kubectl get inferenceservice -A 2>/dev/null
@@ -329,27 +329,121 @@ kubectl get llamastackdistributions -A 2>/dev/null
 
 If InferenceServices are found, get the model details:
 ```bash
-# Get the route and model ID
+ISVC_NS=$(kubectl get inferenceservice -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)
+ISVC_NAME=$(kubectl get inferenceservice -A -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 ISVC_ROUTE=$(kubectl get inferenceservice -A -o jsonpath='{.items[0].status.url}' 2>/dev/null)
 if [ -n "$ISVC_ROUTE" ]; then
-  curl -sk "$ISVC_ROUTE/v1/models" | python3 -c "import sys,json; d=json.load(sys.stdin)['data'][0]; print(f'Model: {d[\"id\"]}, Route: sys.argv[1]')" "$ISVC_ROUTE" 2>/dev/null
+  MODEL_ID=$(curl -sk "$ISVC_ROUTE/v1/models" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+  echo "Found model: $MODEL_ID in namespace $ISVC_NS at $ISVC_ROUTE"
 fi
 ```
 
-If a self-hosted model is found, ask the user:
+Ask the user:
 
-> "Found self-hosted model `<MODEL_ID>` at `<ROUTE>`. You can use this for guardrail safety checks instead of OpenAI API (zero external API calls).
+> "Found self-hosted model `<MODEL_ID>` in namespace `<ISVC_NS>`.
 >
-> **Warning:** Models smaller than 8B parameters (e.g., Llama 3.2 3B) are too small for reliable safety evaluation — the guardrails will silently fail to block harmful content. Use 8B+ general models or specialized safety models (Granite Guardian, Llama Guard).
+> **Recommended:** Deploy a dedicated Llama Stack instance as the inference gateway for guardrails. This lets you switch between self-hosted and remote models by changing one config line.
+>
+> **Warning:** Do NOT modify existing Llama Stack instances (e.g., playground). Create a separate one.
+>
+> **Warning:** Models smaller than 8B parameters are too small for reliable safety evaluation — guardrails will silently fail to block harmful content.
 >
 > Options:
-> 1. **Use self-hosted model** — fully on-cluster, no API keys needed
-> 2. **Use OpenAI API** — GPT-4o-mini, reliable but requires API key + external calls
+> 1. **Llama Stack gateway** (recommended) — routes to both self-hosted vLLM and remote OpenAI through one endpoint
+> 2. **OpenAI direct** — GPT-4o-mini, simpler but no self-hosted option
 > 3. **Skip guardrails** — deploy OpenClaw without safety rails"
 
-If the user chooses the self-hosted model, set `GUARDRAILS_ENGINE=openai`, `GUARDRAILS_MODEL=<MODEL_ID>`, `GUARDRAILS_API_BASE=<ROUTE>/v1`, `GUARDRAILS_API_KEY=none`.
+**If the user chooses Llama Stack gateway (option 1):**
 
-If the user chooses OpenAI, set `GUARDRAILS_ENGINE=openai`, `GUARDRAILS_MODEL=gpt-4o-mini`, `GUARDRAILS_API_BASE=` (empty, uses default OpenAI URL), `GUARDRAILS_API_KEY=${OPENAI_API_KEY}`.
+Create a dedicated Llama Stack instance in the model namespace:
+
+```bash
+# Create config for the dedicated Llama Stack instance
+kubectl apply -n $ISVC_NS -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llama-stack-guardrails-config
+data:
+  config.yaml: |
+    version: "2"
+    image_name: rh
+    apis:
+      - inference
+    providers:
+      inference:
+        - provider_id: vllm-local
+          provider_type: remote::vllm
+          config:
+            base_url: http://${ISVC_NAME}-predictor.${ISVC_NS}.svc.cluster.local:8080/v1
+            api_token: fake
+            max_tokens: 4096
+            tls_verify: false
+        - provider_id: openai-hosted
+          provider_type: remote::openai
+          config:
+            api_key: \${env.OPENAI_API_KEY}
+      safety: []
+    metadata_store:
+      type: sqlite
+      db_path: /opt/app-root/src/.llama/distributions/rh/inference_store.db
+EOF
+```
+
+Ensure `llm-keys` secret exists in the model namespace:
+```bash
+kubectl get secret llm-keys -n $ISVC_NS 2>/dev/null || \
+  kubectl create secret generic llm-keys -n $ISVC_NS --from-literal=openai=$OPENAI_API_KEY
+```
+
+Create the LlamaStackDistribution:
+```bash
+kubectl apply -n $ISVC_NS -f - <<EOF
+apiVersion: llamastack.io/v1alpha1
+kind: LlamaStackDistribution
+metadata:
+  name: lsd-guardrails
+spec:
+  replicas: 1
+  server:
+    containerSpec:
+      env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: llm-keys
+              key: openai
+      name: llama-stack
+      port: 8321
+      resources:
+        requests:
+          cpu: 250m
+          memory: 500Mi
+        limits:
+          cpu: "1"
+          memory: 2Gi
+    distribution:
+      name: rh-dev
+    userConfig:
+      configMapName: llama-stack-guardrails-config
+EOF
+```
+
+Wait for the Llama Stack instance to be ready:
+```bash
+kubectl wait --for=jsonpath='{.status.conditions[?(@.type=="HealthCheck")].status}'=True \
+  llamastackdistribution/lsd-guardrails -n $ISVC_NS --timeout=120s
+```
+
+Set guardrails variables:
+- `GUARDRAILS_MODEL=openai-hosted/gpt-4o-mini` (or `vllm-local/$MODEL_ID` for self-hosted)
+- `GUARDRAILS_API_BASE=http://lsd-guardrails-service.$ISVC_NS.svc.cluster.local:8321/v1`
+- `GUARDRAILS_API_KEY=none`
+
+**If the user chooses OpenAI direct (option 2):**
+- `GUARDRAILS_MODEL=gpt-4o-mini`
+- `GUARDRAILS_API_BASE=` (empty, uses default OpenAI URL)
+- `GUARDRAILS_API_KEY=${OPENAI_API_KEY}`
 
 ### 14. Deploy NeMo Guardrails via TrustyAI operator
 
