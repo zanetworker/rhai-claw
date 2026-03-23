@@ -1,0 +1,70 @@
+graph TB
+    subgraph User["User"]
+        Browser["Browser<br/>(OpenClaw Dashboard)"]
+    end
+
+    subgraph Route["OpenShift Route"]
+        TLS["TLS edge, 300s timeout"]
+    end
+
+    Browser -->|"WSS"| TLS
+
+    subgraph OCNamespace["openclaw namespace"]
+        subgraph SandboxBoundary["· · · Sandbox boundary (Kata / NetworkPolicy) · · ·"]
+            direction TB
+            OpenClaw["OpenClaw Agent<br/>port 18789, WebSocket<br/>model: guardrails-proxy"]
+            
+            subgraph IdentitySidecar["· · · DESIRED: Identity Sidecar · · ·"]
+                SPIFFE["SPIFFE/Envoy<br/>token exchange + mTLS<br/>to MCP servers"]
+            end
+
+            Adapter["OpenAI Adapter<br/>format bridge<br/>list→string, NeMo→OpenAI, SSE"]
+            NeMo["NeMo Guardrails<br/>(TrustyAI NemoGuardrails CRD)<br/>Colang v1 rails:<br/>self_check_input, self_check_output"]
+        end
+    end
+
+    TLS --> OpenClaw
+    OpenClaw -->|"POST /v1/chat/completions"| Adapter
+    Adapter -->|"POST /v1/chat/completions"| NeMo
+    OpenClaw -.->|"OTEL traces<br/>(HTTP-level only)"| MLflowSvc
+
+    subgraph ModelNamespace["model namespace (e.g. test)"]
+        LlamaStack["Llama Stack<br/>(inference gateway)<br/>LlamaStackDistribution CR"]
+        
+        vLLM["vLLM on GPU (A10G)<br/>KServe InferenceService<br/>llama3-2-8b (3B Instruct)"]
+        
+        MLflowSvc["MLflow<br/>/v1/traces (OTLP HTTP)<br/>HTTP-level traces only"]
+    end
+
+    subgraph External["External APIs"]
+        OpenAI["OpenAI API<br/>gpt-4o-mini"]
+    end
+
+    NeMo -->|"POST /v1/chat/completions"| LlamaStack
+    LlamaStack -->|"remote::openai"| OpenAI
+    LlamaStack -->|"remote::vllm"| vLLM
+
+    subgraph Platform["Platform layer (cluster-wide operators)"]
+        KagentiOp["Kagenti Operator<br/>AgentRuntime, AgentCard<br/>A2A discovery"]
+        TrustyAIOp["TrustyAI Operator<br/>NemoGuardrails CRD<br/>Guardrails Orchestrator"]
+        LSOp["Llama Stack Operator<br/>LlamaStackDistribution<br/>CR lifecycle"]
+        MLflowOp["MLflow Operator<br/>Experiment tracking<br/>Trace UI"]
+
+        subgraph Desired["· · · DESIRED · · ·"]
+            SandboxOp["Sandboxed Containers<br/>Operator (Kata/peer pods)"]
+            SPIFFEOp["SPIFFE/SPIRE<br/>workload identity"]
+            MCPGw["MCP Gateway<br/>identity-based tool<br/>access control"]
+            GenAI["GenAI-level traces<br/>prompts, completions<br/>token counts"]
+        end
+    end
+
+    classDef working fill:#2d6a4f,stroke:#1b4332,color:#fff
+    classDef desired fill:#fff,stroke:#6c757d,color:#6c757d,stroke-dasharray: 5 5
+    classDef external fill:#e76f51,stroke:#c1440e,color:#fff
+    classDef platform fill:#264653,stroke:#1d3557,color:#fff
+    classDef namespace fill:#f8f9fa,stroke:#495057,color:#212529
+
+    class Browser,TLS,OpenClaw,Adapter,NeMo,LlamaStack,vLLM,MLflowSvc working
+    class IdentitySidecar,SPIFFE,SandboxBoundary,SandboxOp,SPIFFEOp,MCPGw,GenAI desired
+    class OpenAI external
+    class KagentiOp,TrustyAIOp,LSOp,MLflowOp platform
