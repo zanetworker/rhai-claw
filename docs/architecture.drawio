@@ -76,12 +76,6 @@
         <mxCell id="mlflow" value="MLflow&#xa;/v1/traces (OTLP)&#xa;HTTP-level traces" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="920" y="640" width="160" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="e_oc_mlflow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e76f51;strokeWidth=1;dashed=1;dashPattern=5 3;" edge="1" source="openclaw" target="mlflow" parent="1">
-          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1000" y="245" /></Array></mxGeometry>
-        </mxCell>
-        <mxCell id="e_oc_mlflow_label" value="OTEL traces&#xa;(HTTP-level only)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#e76f51;fontStyle=2;" vertex="1" connectable="0" parent="e_oc_mlflow">
-          <mxGeometry x="0.3" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
-        </mxCell>
 
         <!-- model namespace -->
         <mxCell id="ns_model" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fdf6ec;strokeColor=#d4a843;strokeWidth=2;" vertex="1" parent="1">
@@ -149,6 +143,35 @@
         <!-- Desired platform items -->
         <mxCell id="desired_box" value="DESIRED: Sandboxed Containers Operator  ·  SPIFFE/SPIRE identity  ·  MCP Gateway  ·  GenAI-level traces" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=5 3;fontSize=9;fontColor=#999999;fontStyle=2;" vertex="1" parent="1">
           <mxGeometry x="400" y="970" width="580" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- AgentRuntime configures tracing -->
+        <mxCell id="agentruntime_cr" value="AgentRuntime CR&#xa;spec.trace.endpoint&#xa;→ MLflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="920" y="210" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ar_oc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#264653;strokeWidth=1;dashed=1;dashPattern=3 3;" edge="1" source="agentruntime_cr" target="openclaw" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_ar_oc_label" value="webhook injects&#xa;OTEL env vars" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#264653;fontStyle=2;" vertex="1" connectable="0" parent="e_ar_oc">
+          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- OTEL trace from OpenClaw to MLflow (working, HTTP-level) -->
+        <mxCell id="e_oc_mlflow_trace" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#e76f51;strokeWidth=2;dashed=1;dashPattern=6 3;" edge="1" source="openclaw" target="mlflow" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1020" y="245" />
+              <mxPoint x="1020" y="670" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_oc_mlflow_trace_label" value="OTEL traces&#xa;(HTTP-level only,&#xa;see gotcha)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#e76f51;fontStyle=2;" vertex="1" connectable="0" parent="e_oc_mlflow_trace">
+          <mxGeometry x="0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+
+        <!-- Desired: GenAI traces annotation -->
+        <mxCell id="genai_desired" value="DESIRED: GenAI-level traces&#xa;(prompts, completions, tokens)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#999999;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="400" width="160" height="30" as="geometry" />
         </mxCell>
 
         <!-- Legend -->
