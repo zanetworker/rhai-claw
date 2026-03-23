@@ -58,6 +58,8 @@ The skill walks through everything — operator, webhook, manifests, API keys, t
 
 ## What Gets Deployed
 
+Solid lines are working today. Dotted lines are planned/desired.
+
 ```
                           ┌─────────────────────┐
                           │     User Browser     │
@@ -71,70 +73,98 @@ The skill walks through everything — operator, webhook, manifests, API keys, t
                                      │
 ┌────────────────────────────────────┼────────────────────────────────────────┐
 │ openclaw namespace                 │                                        │
-│                          ┌─────────▼──────────┐                            │
-│                          │   OpenClaw Agent    │                            │
-│                          │  (port 18789, WS)   │                            │
-│                          │                     │                            │
-│                          │  model provider:    │                            │
-│                          │  guardrails-proxy   │                            │
-│                          └─────────┬──────────┘                            │
-│                                    │ POST /v1/chat/completions             │
-│                          ┌─────────▼──────────┐                            │
-│                          │   OpenAI Adapter    │                            │
-│                          │  (format bridge)    │                            │
-│                          │  - list -> string   │                            │
-│                          │  - NeMo -> OpenAI   │                            │
-│                          │  - adds SSE stream  │                            │
-│                          └─────────┬──────────┘                            │
-│                                    │ POST /v1/chat/completions             │
-│                          ┌─────────▼──────────┐                            │
-│                          │  NeMo Guardrails    │                            │
-│                          │  (TrustyAI CRD)     │                            │
-│                          │                     │                            │
-│                          │  Colang v1 rails:   │                            │
-│                          │  - self_check_input │                            │
-│                          │  - self_check_output│                            │
-│                          │  - flow matching    │                            │
-│                          └─────────┬──────────┘                            │
 │                                    │                                        │
-└────────────────────────────────────┼────────────────────────────────────────┘
-                                     │ POST /v1/chat/completions
-┌────────────────────────────────────┼────────────────────────────────────────┐
-│ model namespace (e.g. test)        │                                        │
+│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐  │
+│    DESIRED: Sandboxed pod (Kata)   │   or NetworkPolicy isolation          │
+│  │                                 │                                   │  │
 │                          ┌─────────▼──────────┐                            │
-│                          │   Llama Stack       │                            │
-│                          │  (inference gateway)│                            │
-│                          │                     │                            │
-│                          │  Providers:         │                            │
-│                          │  ┌───────────────┐  │    ┌───────────────────┐  │
-│                          │  │ remote::openai ├──┼───▶│   OpenAI API      │  │
-│                          │  └───────────────┘  │    │  (gpt-4o-mini)    │  │
-│                          │  ┌───────────────┐  │    └───────────────────┘  │
-│                          │  │ remote::vllm  ├──┼──┐                        │
-│                          │  └───────────────┘  │  │                        │
-│                          └────────────────────┘  │                        │
-│                                                   │                        │
-│                          ┌────────────────────────▼───────────────────┐    │
-│                          │          vLLM on GPU (A10G)                │    │
-│                          │   KServe InferenceService                  │    │
-│                          │   Model: llama3-2-8b (3B Instruct)        │    │
-│                          └───────────────────────────────────────────┘    │
-│                                                                            │
-└────────────────────────────────────────────────────────────────────────────┘
+│  │                       │   OpenClaw Agent    │  ·····OTEL······┐     │  │
+│                          │  (port 18789, WS)   │                 │         │
+│  │                       │                     │                 │     │  │
+│                          │  model provider:    │                 │         │
+│  │                       │  guardrails-proxy   │                 │     │  │
+│                          └─────────┬──────────┘                 │         │
+│  │                                 │                             │     │  │
+│   ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐          │                             │         │
+│  ││ DESIRED: Identity  │          │                             │     │  │
+│   │ sidecar (SPIFFE/   │          │                             │         │
+│  ││ Envoy) for token   │          │                             │     │  │
+│   │ exchange + mTLS    │          │                             │         │
+│  ││ to MCP servers     │          │                             │     │  │
+│   └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘          │                             │         │
+│  │                                 │ POST /v1/chat/completions  │     │  │
+│                          ┌─────────▼──────────┐                 │         │
+│  │                       │   OpenAI Adapter    │                 │     │  │
+│                          │  (format bridge)    │                 │         │
+│  │                       │  - list -> string   │                 │     │  │
+│                          │  - NeMo -> OpenAI   │                 │         │
+│  │                       │  - adds SSE stream  │                 │     │  │
+│                          └─────────┬──────────┘                 │         │
+│  │                                 │ POST /v1/chat/completions  │     │  │
+│                          ┌─────────▼──────────┐                 │         │
+│  │                       │  NeMo Guardrails    │                 │     │  │
+│                          │  (TrustyAI CRD)     │                 │         │
+│  │                       │                     │                 │     │  │
+│                          │  Colang v1 rails:   │                 │         │
+│  │                       │  - self_check_input │                 │     │  │
+│                          │  - self_check_output│                 │         │
+│  │                       │  - flow matching    │                 │     │  │
+│                          └─────────┬──────────┘                 │         │
+│  │                                 │                             │     │  │
+│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─│─ ─ ┘  │
+│                                    │                             │        │
+└────────────────────────────────────┼─────────────────────────────┼────────┘
+                                     │                             │
+                                     │ POST /v1/chat/completions  │ OTLP
+                                     │                             │
+┌────────────────────────────────────┼─────────────────────────────┼────────┐
+│ model namespace (e.g. test)        │                             │        │
+│                          ┌─────────▼──────────┐      ┌──────────▼─────┐  │
+│                          │   Llama Stack       │      │    MLflow      │  │
+│                          │  (inference gateway)│      │                │  │
+│                          │                     │      │  /v1/traces    │  │
+│                          │  Providers:         │      │  (OTLP HTTP)  │  │
+│                          │  ┌───────────────┐  │      │                │  │
+│                          │  │ remote::openai ├─┼──┐   │  HTTP-level   │  │
+│                          │  └───────────────┘  │  │   │  traces only  │  │
+│                          │  ┌───────────────┐  │  │   │  (see gotcha) │  │
+│                          │  │ remote::vllm  ├──┼──┼┐  └───────────────┘  │
+│                          │  └───────────────┘  │  ││                     │
+│                          └────────────────────┘  ││                     │
+│                                                   ││                     │
+│                          ┌────────────────────────▼┼──────────────────┐  │
+│                          │    vLLM on GPU (A10G)   │                  │  │
+│                          │    KServe InferenceSvc  │                  │  │
+│                          │    llama3-2-8b (3B)     │                  │  │
+│                          └─────────────────────────┘                  │  │
+│                                                    │                     │
+│                                              ┌─────▼───────────────┐    │
+│                                              │   OpenAI API        │    │
+│                                              │   (gpt-4o-mini)     │    │
+│                                              └─────────────────────┘    │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
 
-┌────────────────────────────────────────────────────────────────────────────┐
-│ Platform layer (cluster-wide)                                              │
-│                                                                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │   Kagenti    │  │   TrustyAI   │  │  Llama Stack │  │    MLflow    │  │
-│  │   Operator   │  │   Operator   │  │   Operator   │  │   Operator   │  │
-│  │              │  │              │  │              │  │              │  │
-│  │ AgentRuntime │  │ NemoGuardrail│  │ LlamaStack   │  │  OTEL traces │  │
-│  │ AgentCard    │  │ Guardrails   │  │ Distribution │  │  to MLflow   │  │
-│  │ A2A discover │  │ Orchestrator │  │ CR lifecycle │  │  /v1/traces  │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  │
-│                                                                            │
-└────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Platform layer (cluster-wide operators)                                  │
+│                                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐  │
+│  │   Kagenti    │  │   TrustyAI   │  │  Llama Stack │  │   MLflow   │  │
+│  │   Operator   │  │   Operator   │  │   Operator   │  │  Operator  │  │
+│  │              │  │              │  │              │  │            │  │
+│  │ AgentRuntime │  │ NemoGuardrail│  │ LlamaStack   │  │ Experiment │  │
+│  │ AgentCard    │  │ Guardrails   │  │ Distribution │  │ tracking   │  │
+│  │ A2A discover │  │ Orchestrator │  │ CR lifecycle │  │ trace UI   │  │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └────────────┘  │
+│                                                                          │
+│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐  │
+│    DESIRED: Sandboxed Containers Operator (Kata/peer pods)               │
+│  │ DESIRED: SPIFFE/SPIRE for workload identity                       │  │
+│    DESIRED: MCP Gateway with identity-based tool access control          │
+│  │ DESIRED: GenAI-level traces (prompts, completions, token counts)  │  │
+│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘  │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 Three Kagenti primitives manage the agent's lifecycle:
