@@ -16,6 +16,7 @@ This repo is the companion to [Operationalizing "Bring Your Own Agent" on Red Ha
 - [Configuration](#configuration)
 - [NeMo Guardrails Integration](#nemo-guardrails-integration)
 - [Gotchas by Team](#gotchas-by-team)
+- [Component Versions Tested](#component-versions-tested)
 - [AgentRuntime Controller](#agentruntime-controller)
 - [Webhook Changes (not yet upstream)](#webhook-changes-not-yet-upstream)
 - [Related Projects](#related-projects)
@@ -280,6 +281,29 @@ Deep-dive docs per area:
 - [docs/gotchas-mlflow-tracing.md](docs/gotchas-mlflow-tracing.md)
 - [docs/gotchas-sandboxed-containers.md](docs/gotchas-sandboxed-containers.md)
 - [docs/gotchas-llama-stack.md](docs/gotchas-llama-stack.md)
+
+## Component Versions Tested
+
+All gotchas and documentation in this repo were discovered and validated against these specific versions.
+
+| Component | Version | Image / Source |
+|-----------|---------|---------------|
+| OpenShift | 4.20.8 | |
+| Red Hat OpenShift AI | 3.4.0-ea.2 | `rhods-operator` |
+| OpenClaw | 2026.3.14 | `quay.io/aicatalyst/openclaw:latest` |
+| NeMo Guardrails | 0.18.0 | `quay.io/trustyai/nemo-guardrails-server:latest` |
+| NeMo Guardrails (upstream latest) | 0.21.0 | Some gotchas may be fixed upstream |
+| TrustyAI Service Operator | RHOAI 3.4-ea.2 bundled | `registry.redhat.io/rhoai/odh-trustyai-service-operator-rhel9` |
+| Llama Stack Server | 0.6.0+rhai0 | `registry.redhat.io/rhoai/odh-llama-stack-core-rhel9` |
+| Llama Stack Operator | 0.4.0 | `registry.redhat.io/rhoai/odh-llama-stack-k8s-operator-rhel9` |
+| vLLM | RHOAI bundled | `registry.redhat.io/rhaiis/vllm-cuda-rhel9` |
+| Model (inference) | Llama 3.2 3B Instruct | `quay.io/redhat-ai-services/modelcar-catalog:llama-3.2-3b-instruct` |
+| Model (guardrail eval) | GPT-4o-mini (via Llama Stack `remote::openai`) | OpenAI API |
+| MLflow Operator | RHOAI 3.4-ea.2 bundled | `registry.redhat.io/rhoai/odh-mlflow-operator-rhel9` |
+| Kagenti Operator | 0.2.0-alpha.22 | `oci://ghcr.io/kagenti/kagenti-operator/kagenti-operator-chart` |
+| Sandboxed Containers Operator | 1.11.1 | Installed and removed during testing |
+| GPU | NVIDIA A10G (24GB) | g5.2xlarge instance |
+| Cluster infra | AWS us-east-2 | m6a.4xlarge workers |
 
 ## AgentRuntime Controller
 
