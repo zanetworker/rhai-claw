@@ -2,6 +2,8 @@
 
 Issues encountered integrating NeMo Guardrails with OpenClaw on Red Hat AI. Each gotcha includes the root cause, our workaround, and what should be fixed upstream.
 
+**Version tested:** NeMo Guardrails **0.18.0** in RHOAI image `quay.io/trustyai/nemo-guardrails-server:latest` (RHOAI 3.4.0-ea.2). Upstream latest is **0.21.0**. Some gotchas may be resolved in newer versions but are present in the RHOAI-shipped image.
+
 ## Severity
 
 | Rating | Icon | Meaning |
@@ -13,6 +15,8 @@ Issues encountered integrating NeMo Guardrails with OpenClaw on Red Hat AI. Each
 ## Surprising
 
 ### 1. Response format mismatch (NeMo vs OpenAI) :warning:
+
+**Affected version:** 0.18.0 (RHOAI). Status in upstream 0.21.0: unknown.
 
 **Symptom:** OpenClaw shows empty responses. The guardrails service returns 200 OK but the content is missing.
 
@@ -33,6 +37,8 @@ NeMo's docs describe the endpoint as "OpenAI-compatible" but the response shape 
 **What should be fixed:** NeMo Guardrails server should return standard OpenAI response format when the request comes in on `/v1/chat/completions`. Or expose a separate truly-OpenAI-compatible endpoint.
 
 ### 2. Multi-part content crashes `get_colang_history()` :warning:
+
+**Affected version:** 0.18.0 (RHOAI). Crash is in `nemoguardrails/actions/llm/utils.py` line 442. Status in upstream 0.21.0: unknown.
 
 **Symptom:** First message works fine. Second message returns "Internal server error." The guardrails correctly blocks/allows the request, generates the response, then crashes during post-processing.
 
@@ -67,6 +73,8 @@ for msg in req_json.get("messages", []):
 
 ### 3. No streaming support :warning:
 
+**Affected version:** 0.18.0 (RHOAI). Status in upstream 0.21.0: unknown.
+
 **Symptom:** OpenClaw sends `"stream": true` in requests. NeMo Guardrails ignores the flag and returns a single JSON response. OpenClaw expects SSE (Server-Sent Events) chunks and shows empty output or "Internal server error."
 
 **Root cause:** The NeMo Guardrails open-source server does not support streaming responses. It always returns a complete response in one shot, regardless of the `stream` parameter.
@@ -86,6 +94,8 @@ The entire response is sent as a single SSE chunk (not token-by-token), so the u
 
 ### 4. RHOAI image missing `langchain-anthropic` :warning:
 
+**Affected version:** 0.18.0 (RHOAI image). NeMo itself supports `engine: anthropic`; the image just doesn't ship the package.
+
 **Symptom:** NeMo Guardrails pod crashes on startup with `ModuleNotFoundError: No module named 'langchain_anthropic'` when configured to use Anthropic as the LLM engine.
 
 **Root cause:** The RHOAI-bundled image (`quay.io/trustyai/nemo-guardrails-server:latest`) does not include the `langchain-anthropic` package. It ships with `langchain-openai` but not the Anthropic equivalent.
@@ -100,6 +110,8 @@ This adds ~15s to pod startup time.
 **What should be fixed:** The RHOAI NeMo Guardrails image should include `langchain-anthropic` (and `langchain-google-genai` etc.) to support all major LLM providers out of the box.
 
 ### 5. Self-check prompt too sensitive to agent metadata :warning:
+
+**Affected version:** 0.18.0 (RHOAI). This is a prompt design issue, not a code bug. Applies to any version using the default self-check prompt.
 
 **Symptom:** NeMo Guardrails blocks normal "hello" messages. The self-check input rail flags benign messages as "SAFETY VIOLATION DETECTED: Potential system exploitation attempt."
 
@@ -118,7 +130,7 @@ Also changed the `instructions` from "You are a safety guardrail" (which caused 
 
 ### 7. NeMo Guardrails depends on LangChain for LLM access :warning:
 
-**Priority rank: NEW**
+**Affected version:** 0.18.0 (RHOAI) and all versions. This is an architectural dependency, not a version-specific bug.
 
 NeMo Guardrails doesn't call LLM APIs directly. It uses LangChain as its LLM abstraction layer. The `engine` field in `config.yaml` maps to a specific `langchain-*` Python package:
 
@@ -157,7 +169,7 @@ This is a hidden dependency chain: NeMo → LangChain → provider-specific Lang
 
 ### 9. Small models (3B) can't reliably evaluate safety rails :warning:
 
-**Priority rank: NEW**
+**Affected version:** 0.18.0 (RHOAI) and all versions. This is a model capability issue, not a NeMo bug. NeMo does not validate model quality for self-checks.
 
 **Symptom:** All responses are generic ("Hello! How can I assist you today?") regardless of what the user asks. Blocked requests are not blocked — they also return the generic greeting. The self-check rails don't work.
 
@@ -190,7 +202,7 @@ A 3B parameter model (Llama 3.2 3B Instruct) is too small to do this reliably. I
 
 ### 8. NeMo Guardrails only accepts OpenAI format — can't guard Anthropic Messages API traffic :no_entry:
 
-**Priority rank: NEW**
+**Affected version:** 0.18.0 (RHOAI) and all versions. NeMo's server has no `/v1/messages` endpoint in any version.
 
 **Symptom:** An agent configured to use Anthropic's built-in provider (e.g., OpenClaw with `claude-sonnet-4-20250514 · anthropic` selected) sends requests using the Anthropic Messages API format (`POST /v1/messages`). NeMo Guardrails can't intercept or proxy these requests — it only accepts OpenAI chat completions format (`POST /v1/chat/completions`).
 
@@ -232,6 +244,8 @@ Agent ──OpenAI format──▶ Adapter ──▶ NeMo ──engine:anthropic
 ## Dead Ends
 
 ### 6. `NemoGuardrail` CRD doesn't support custom commands :no_entry:
+
+**Affected version:** TrustyAI operator in RHOAI 3.4.0-ea.2. This is a CRD limitation, not a NeMo version issue.
 
 **Symptom:** Cannot use the `NemoGuardrail` CRD from the NIM Operator to deploy with `langchain-anthropic` because the CRD doesn't allow command overrides.
 
