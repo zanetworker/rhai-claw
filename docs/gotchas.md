@@ -48,7 +48,7 @@ The top gotchas across all teams, ranked by how likely they are to block you and
 | 30 | :bulb: | [Kagenti](#kagenti--platform-team) | [AgentRuntime CRD not in Helm chart](gotchas-platform-kagenti.md#agentruntime-crd-not-in-helm-chart-bulb) | 5 min — manual install |
 | 31 | :bulb: | [Kagenti](#kagenti--platform-team) | [CRDs get stuck terminating](gotchas-platform-kagenti.md#crds-get-stuck-terminating-bulb) | 5 min — patch finalizers |
 | 32 | :bulb: | [MLflow](#mlflow--observability-team) | [Experiment ID must be header](gotchas-mlflow-tracing.md#3-mlflow-experiment-id-must-be-passed-as-header-bulb) | 5 min |
-| 33 | :bulb: | [OpenClaw](#openclaw--agent-team) | [Device pairing required after reconnect](gotchas-application.md#device-pairing-required-after-every-reconnect-bulb) | 2 min per session |
+| 33 | :bulb: | [OpenClaw](#openclaw--agent-team) | [Device pairing required after reconnect](gotchas-application.md#device-pairing-required-after-every-reconnect-bulb) | UX friction, but adds security (prevents unauthorized access) |
 | 34 | :bulb: | [Kagenti](#kagenti--platform-team) | [Deployment name mismatch in webhook](gotchas-platform-kagenti.md#deployment-name-mismatch-in-webhook-bulb) | Patched in fork |
 | 35 | :bulb: | [Kagenti](#kagenti--platform-team) | [AgentCards CRD only from Helm first-install](gotchas-platform-kagenti.md#agentcards-crd-only-from-helm-first-install-bulb) | Avoid deleting CRDs |
 | 36 | :bulb: | [OpenClaw](#openclaw--agent-team) | [Browser automation broken in container](gotchas-application.md#browser-automation-broken-bulb) | No Chrome in image |
@@ -70,7 +70,7 @@ Owner: OpenClaw upstream
 | 16 | :bulb: | Binds to loopback by default | Agent unreachable in K8s |
 | 17 | :bulb: | Hardcoded port 18789 | `PORT` env var ignored |
 | 19 | :bulb: | Gateway token regenerates on restart | Re-pairing needed |
-| 20 | :bulb: | Device pairing required after reconnect | UX friction |
+| 20 | :bulb: | Device pairing required after reconnect | UX friction, but adds security |
 | 32 | :bulb: | Browser automation broken | No Chrome in image |
 
 Full details: [gotchas-application.md](gotchas-application.md)

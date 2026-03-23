@@ -85,4 +85,6 @@ OpenClaw generates a gateway auth token on first boot, writes to `openclaw.json`
 
 OpenClaw's Control UI uses a device pairing model (like messaging apps). New browser sessions register as "devices" needing operator approval. Pairing persists across page refreshes but is lost on pod restart.
 
+This is UX friction, but it's also a security feature — it prevents unauthorized access even if someone has the gateway URL and token. The pairing model ensures only explicitly approved devices can interact with the agent.
+
 **Fix:** `make approve-pairing` or auto-approve in the deploy skill.
