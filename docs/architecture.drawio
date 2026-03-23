@@ -1,163 +1,141 @@
-<mxfile host="app.diagrams.net" modified="2026-03-23T14:00:00.000Z" agent="rhai-claw" version="24.0.0">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.1 Chrome/142.0.7444.265 Electron/39.8.0 Safari/537.36" version="29.6.1">
   <diagram name="Platform Architecture" id="rhai-claw-arch">
-    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+    <mxGraphModel dx="2231" dy="1156" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-
-        <!-- User -->
-        <mxCell id="user" value="User Browser&#xa;(OpenClaw Dashboard)" style="shape=actor;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="680" y="20" width="120" height="60" as="geometry" />
+        <mxCell id="user" parent="1" style="shape=actor;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=11;" value="User Browser&#xa;(OpenClaw Dashboard)" vertex="1">
+          <mxGeometry height="60" width="120" x="680" y="20" as="geometry" />
         </mxCell>
-
-        <!-- Route -->
-        <mxCell id="route" value="OpenShift Route&#xa;TLS edge, 300s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="660" y="120" width="160" height="40" as="geometry" />
+        <mxCell id="route" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="OpenShift Route&#xa;TLS edge, 300s" vertex="1">
+          <mxGeometry height="40" width="160" x="660" y="120" as="geometry" />
         </mxCell>
-        <mxCell id="e_user_route" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" edge="1" source="user" target="route" parent="1">
+        <mxCell id="e_user_route" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" target="route">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_user_route_label" value="WSS" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666666;" vertex="1" connectable="0" parent="e_user_route">
-          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        <mxCell id="e_user_route_label" connectable="0" parent="e_user_route" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666666;" value="WSS" vertex="1">
+          <mxGeometry relative="1" x="-0.2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
-
-        <!-- Sandbox boundary (desired) -->
-        <mxCell id="sandbox" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=2;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
-          <mxGeometry x="400" y="180" width="680" height="380" as="geometry" />
+        <mxCell id="sandbox" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=2;dashed=1;dashPattern=8 4;" value="" vertex="1">
+          <mxGeometry height="380" width="680" x="400" y="180" as="geometry" />
         </mxCell>
-        <mxCell id="sandbox_label" value="Sandbox boundary (Kata VM or NetworkPolicy)  ·  DESIRED" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#999999;fontStyle=2;" vertex="1" parent="1">
-          <mxGeometry x="410" y="185" width="400" height="20" as="geometry" />
+        <mxCell id="sandbox_label" parent="1" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#999999;fontStyle=2;" value="Sandbox boundary (Kata VM or NetworkPolicy)  ·  DESIRED" vertex="1">
+          <mxGeometry height="20" width="400" x="410" y="185" as="geometry" />
         </mxCell>
-
-        <!-- openclaw namespace -->
-        <mxCell id="ns_openclaw" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f4f8;strokeColor=#4a90d9;strokeWidth=2;" vertex="1" parent="1">
-          <mxGeometry x="380" y="170" width="720" height="400" as="geometry" />
+        <mxCell id="ns_openclaw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f4f8;strokeColor=#4a90d9;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="400" width="730" x="370" y="170" as="geometry" />
         </mxCell>
-        <mxCell id="ns_openclaw_label" value="openclaw namespace" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#4a90d9;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="390" y="172" width="200" height="20" as="geometry" />
+        <mxCell id="ns_openclaw_label" parent="1" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#4a90d9;fontStyle=1;" value="openclaw namespace" vertex="1">
+          <mxGeometry height="20" width="200" x="390" y="172" as="geometry" />
         </mxCell>
-
-        <!-- OpenClaw -->
-        <mxCell id="openclaw" value="OpenClaw Agent&#xa;port 18789 (WebSocket)&#xa;model: guardrails-proxy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="640" y="210" width="200" height="70" as="geometry" />
+        <mxCell id="openclaw" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=11;fontStyle=1;" value="OpenClaw Agent&#xa;port 18789 (WebSocket)&#xa;model: guardrails-proxy" vertex="1">
+          <mxGeometry height="70" width="200" x="640" y="210" as="geometry" />
         </mxCell>
-        <mxCell id="e_route_oc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" edge="1" source="route" target="openclaw" parent="1">
+        <mxCell id="e_route_oc" edge="1" parent="1" source="route" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" target="openclaw">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Adapter -->
-        <mxCell id="adapter" value="OpenAI Adapter&#xa;(format bridge)&#xa;list→string · NeMo→OpenAI · SSE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="640" y="320" width="200" height="60" as="geometry" />
+        <mxCell id="adapter" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=10;" value="OpenAI Adapter&#xa;(format bridge)&#xa;list→string · NeMo→OpenAI · SSE" vertex="1">
+          <mxGeometry height="60" width="200" x="640" y="320" as="geometry" />
         </mxCell>
-        <mxCell id="e_oc_adapter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" edge="1" source="openclaw" target="adapter" parent="1">
+        <mxCell id="e_oc_adapter" edge="1" parent="1" source="openclaw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" target="adapter">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_oc_adapter_label" value="/v1/chat/completions" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#666666;" vertex="1" connectable="0" parent="e_oc_adapter">
-          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        <mxCell id="e_oc_adapter_label" connectable="0" parent="e_oc_adapter" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#666666;" value="/v1/chat/completions" vertex="1">
+          <mxGeometry relative="1" x="-0.2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
-
-        <!-- NeMo Guardrails -->
-        <mxCell id="nemo" value="NeMo Guardrails&#xa;(TrustyAI NemoGuardrails CRD)&#xa;Colang v1: self_check_input/output" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="640" y="420" width="200" height="70" as="geometry" />
+        <mxCell id="nemo" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=10;" value="NeMo Guardrails&#xa;(TrustyAI NemoGuardrails CRD)&#xa;Colang v1: self_check_input/output" vertex="1">
+          <mxGeometry height="70" width="200" x="640" y="420" as="geometry" />
         </mxCell>
-        <mxCell id="e_adapter_nemo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" edge="1" source="adapter" target="nemo" parent="1">
+        <mxCell id="e_adapter_nemo" edge="1" parent="1" source="adapter" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" target="nemo">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_adapter_nemo_label" value="/v1/chat/completions" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#666666;" vertex="1" connectable="0" parent="e_adapter_nemo">
-          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        <mxCell id="e_adapter_nemo_label" connectable="0" parent="e_adapter_nemo" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#666666;" value="/v1/chat/completions" vertex="1">
+          <mxGeometry relative="1" x="-0.2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
-
-        <!-- Identity sidecar (desired) -->
-        <mxCell id="identity" value="DESIRED&#xa;Identity Sidecar&#xa;SPIFFE/Envoy&#xa;token exchange + mTLS&#xa;to MCP servers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=5 3;fontSize=9;fontColor=#999999;fontStyle=2;" vertex="1" parent="1">
-          <mxGeometry x="420" y="300" width="160" height="90" as="geometry" />
+        <mxCell id="identity" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=5 3;fontSize=9;fontColor=#999999;fontStyle=2;" value="DESIRED&#xa;Identity Sidecar&#xa;SPIFFE/Envoy&#xa;token exchange + mTLS&#xa;to MCP servers" vertex="1">
+          <mxGeometry height="90" width="160" x="420" y="300" as="geometry" />
         </mxCell>
-
-        <!-- MLflow -->
-        <mxCell id="mlflow" value="MLflow&#xa;/v1/traces (OTLP)&#xa;HTTP-level traces" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="920" y="640" width="160" height="60" as="geometry" />
+        <mxCell id="mlflow" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=10;" value="MLflow&#xa;/v1/traces (OTLP)&#xa;HTTP-level traces" vertex="1">
+          <mxGeometry height="60" width="160" x="920" y="640" as="geometry" />
         </mxCell>
-
-        <!-- model namespace -->
-        <mxCell id="ns_model" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fdf6ec;strokeColor=#d4a843;strokeWidth=2;" vertex="1" parent="1">
-          <mxGeometry x="380" y="610" width="720" height="200" as="geometry" />
+        <mxCell id="ns_model" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fdf6ec;strokeColor=#d4a843;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="200" width="720" x="380" y="610" as="geometry" />
         </mxCell>
-        <mxCell id="ns_model_label" value="model namespace (e.g. test)" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#d4a843;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="390" y="612" width="250" height="20" as="geometry" />
+        <mxCell id="ns_model_label" parent="1" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#d4a843;fontStyle=1;" value="model namespace (e.g. test)" vertex="1">
+          <mxGeometry height="20" width="250" x="390" y="612" as="geometry" />
         </mxCell>
-
-        <!-- Llama Stack -->
-        <mxCell id="llamastack" value="Llama Stack&#xa;(inference gateway)&#xa;LlamaStackDistribution CR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="640" y="640" width="200" height="60" as="geometry" />
+        <mxCell id="llamastack" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=11;fontStyle=1;" value="Llama Stack&#xa;(inference gateway)&#xa;LlamaStackDistribution CR" vertex="1">
+          <mxGeometry height="60" width="200" x="640" y="640" as="geometry" />
         </mxCell>
-        <mxCell id="e_nemo_ls" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" edge="1" source="nemo" target="llamastack" parent="1">
+        <mxCell id="e_nemo_ls" edge="1" parent="1" source="nemo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" target="llamastack">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_nemo_ls_label" value="/v1/chat/completions" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#666666;" vertex="1" connectable="0" parent="e_nemo_ls">
-          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        <mxCell id="e_nemo_ls_label" connectable="0" parent="e_nemo_ls" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#666666;" value="/v1/chat/completions" vertex="1">
+          <mxGeometry relative="1" x="-0.2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
-
-        <!-- vLLM -->
-        <mxCell id="vllm" value="vLLM on GPU (A10G)&#xa;KServe InferenceService&#xa;llama3-2-8b (3B Instruct)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="420" y="730" width="200" height="60" as="geometry" />
+        <mxCell id="vllm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;fontColor=#ffffff;fontSize=10;" value="vLLM on GPU (A10G)&#xa;KServe InferenceService&#xa;llama3-2-8b (3B Instruct)" vertex="1">
+          <mxGeometry height="60" width="200" x="420" y="730" as="geometry" />
         </mxCell>
-        <mxCell id="e_ls_vllm" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" edge="1" source="llamastack" target="vllm" parent="1">
+        <mxCell id="e_ls_vllm" edge="1" parent="1" source="llamastack" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" target="vllm">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_ls_vllm_label" value="remote::vllm" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666666;" vertex="1" connectable="0" parent="e_ls_vllm">
-          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        <mxCell id="e_ls_vllm_label" connectable="0" parent="e_ls_vllm" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666666;" value="remote::vllm" vertex="1">
+          <mxGeometry relative="1" x="-0.2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
-
-        <!-- OpenAI API -->
-        <mxCell id="openai" value="OpenAI API&#xa;gpt-4o-mini" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e76f51;strokeColor=#c1440e;fontColor=#ffffff;fontSize=11;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="700" y="730" width="140" height="60" as="geometry" />
+        <mxCell id="openai" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e76f51;strokeColor=#c1440e;fontColor=#ffffff;fontSize=11;fontStyle=1;" value="OpenAI API&#xa;gpt-4o-mini" vertex="1">
+          <mxGeometry height="60" width="140" x="700" y="730" as="geometry" />
         </mxCell>
-        <mxCell id="e_ls_openai" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" edge="1" source="llamastack" target="openai" parent="1">
+        <mxCell id="e_ls_openai" edge="1" parent="1" source="llamastack" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#333333;" target="openai">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_ls_openai_label" value="remote::openai" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666666;" vertex="1" connectable="0" parent="e_ls_openai">
-          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        <mxCell id="e_ls_openai_label" connectable="0" parent="e_ls_openai" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666666;" value="remote::openai" vertex="1">
+          <mxGeometry relative="1" x="-0.2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
-
-        <!-- Platform layer -->
-        <mxCell id="platform" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8ecf1;strokeColor=#264653;strokeWidth=2;" vertex="1" parent="1">
-          <mxGeometry x="380" y="850" width="720" height="160" as="geometry" />
+        <mxCell id="platform" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8ecf1;strokeColor=#264653;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="160" width="720" x="380" y="850" as="geometry" />
         </mxCell>
-        <mxCell id="platform_label" value="Platform layer (cluster-wide operators)" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#264653;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="390" y="852" width="350" height="20" as="geometry" />
+        <mxCell id="platform_label" parent="1" style="text;html=1;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;fontColor=#264653;fontStyle=1;" value="Platform layer (cluster-wide operators)" vertex="1">
+          <mxGeometry height="20" width="350" x="390" y="852" as="geometry" />
         </mxCell>
-
-        <!-- Operators -->
-        <mxCell id="op_kagenti" value="Kagenti&#xa;Operator&#xa;AgentRuntime&#xa;AgentCard&#xa;A2A discovery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="400" y="880" width="130" height="80" as="geometry" />
+        <mxCell id="op_kagenti" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" value="Kagenti&#xa;Operator&#xa;AgentRuntime&#xa;AgentCard&#xa;A2A discovery" vertex="1">
+          <mxGeometry height="80" width="130" x="400" y="880" as="geometry" />
         </mxCell>
-        <mxCell id="op_trustyai" value="TrustyAI&#xa;Operator&#xa;NemoGuardrails&#xa;Guardrails&#xa;Orchestrator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="550" y="880" width="130" height="80" as="geometry" />
+        <mxCell id="op_trustyai" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" value="TrustyAI&#xa;Operator&#xa;NemoGuardrails&#xa;Guardrails&#xa;Orchestrator" vertex="1">
+          <mxGeometry height="80" width="130" x="550" y="880" as="geometry" />
         </mxCell>
-        <mxCell id="op_ls" value="Llama Stack&#xa;Operator&#xa;LlamaStack&#xa;Distribution&#xa;CR lifecycle" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="700" y="880" width="130" height="80" as="geometry" />
+        <mxCell id="op_ls" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" value="Llama Stack&#xa;Operator&#xa;LlamaStack&#xa;Distribution&#xa;CR lifecycle" vertex="1">
+          <mxGeometry height="80" width="130" x="700" y="880" as="geometry" />
         </mxCell>
-        <mxCell id="op_mlflow" value="MLflow&#xa;Operator&#xa;Experiment&#xa;tracking&#xa;Trace UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="850" y="880" width="130" height="80" as="geometry" />
+        <mxCell id="op_mlflow" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" value="MLflow&#xa;Operator&#xa;Experiment&#xa;tracking&#xa;Trace UI" vertex="1">
+          <mxGeometry height="80" width="130" x="850" y="880" as="geometry" />
         </mxCell>
-
-        <!-- Desired platform items -->
-        <mxCell id="desired_box" value="DESIRED: Sandboxed Containers Operator  ·  SPIFFE/SPIRE identity  ·  MCP Gateway  ·  GenAI-level traces" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=5 3;fontSize=9;fontColor=#999999;fontStyle=2;" vertex="1" parent="1">
-          <mxGeometry x="400" y="970" width="580" height="30" as="geometry" />
+        <mxCell id="desired_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=5 3;fontSize=9;fontColor=#999999;fontStyle=2;" value="&lt;font style=&quot;font-size: 10px; color: rgb(0, 0, 0);&quot;&gt;DESIRED: Sandboxed Containers Operator  ·  SPIFFE/SPIRE identity  ·  MCP Gateway  ·  GenAI-level traces&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="580" x="400" y="970" as="geometry" />
         </mxCell>
-
-        <!-- AgentRuntime configures tracing -->
-        <mxCell id="agentruntime_cr" value="AgentRuntime CR&#xa;spec.trace.endpoint&#xa;→ MLflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="920" y="210" width="140" height="50" as="geometry" />
+        <mxCell id="agentruntime_cr" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;fontColor=#ffffff;fontSize=9;" value="AgentRuntime CR&#xa;spec.trace.endpoint&#xa;→ MLflow" vertex="1">
+          <mxGeometry height="50" width="140" x="920" y="210" as="geometry" />
         </mxCell>
-        <mxCell id="e_ar_oc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#264653;strokeWidth=1;dashed=1;dashPattern=3 3;" edge="1" source="agentruntime_cr" target="openclaw" parent="1">
+        <mxCell id="e_ar_oc" edge="1" parent="1" source="agentruntime_cr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#264653;strokeWidth=1;dashed=1;dashPattern=3 3;" target="openclaw">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e_ar_oc_label" value="webhook injects&#xa;OTEL env vars" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#264653;fontStyle=2;" vertex="1" connectable="0" parent="e_ar_oc">
-          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        <mxCell id="e_ar_oc_label" connectable="0" parent="e_ar_oc" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#264653;fontStyle=2;" value="webhook injects&#xa;OTEL env vars" vertex="1">
+          <mxGeometry relative="1" x="-0.2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
-
-        <!-- OTEL trace from OpenClaw to MLflow (working, HTTP-level) -->
-        <mxCell id="e_oc_mlflow_trace" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#e76f51;strokeWidth=2;dashed=1;dashPattern=6 3;" edge="1" source="openclaw" target="mlflow" parent="1">
+        <mxCell id="e_oc_mlflow_trace" edge="1" parent="1" source="openclaw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#e76f51;strokeWidth=2;dashed=1;dashPattern=6 3;" target="mlflow">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="1020" y="245" />
@@ -165,44 +143,44 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_oc_mlflow_trace_label" value="OTEL traces&#xa;(HTTP-level only,&#xa;see gotcha)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#e76f51;fontStyle=2;" vertex="1" connectable="0" parent="e_oc_mlflow_trace">
-          <mxGeometry x="0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        <mxCell id="e_oc_mlflow_trace_label" connectable="0" parent="e_oc_mlflow_trace" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=8;fontColor=#e76f51;fontStyle=2;" value="OTEL traces&#xa;(HTTP-level only,&#xa;see gotcha)" vertex="1">
+          <mxGeometry relative="1" x="0.2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
-
-        <!-- Desired: GenAI traces annotation -->
-        <mxCell id="genai_desired" value="DESIRED: GenAI-level traces&#xa;(prompts, completions, tokens)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#999999;fontStyle=2;" vertex="1" parent="1">
-          <mxGeometry x="1050" y="400" width="160" height="30" as="geometry" />
+        <mxCell id="genai_desired" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#999999;fontStyle=2;" value="DESIRED: GenAI-level traces&#xa;(prompts, completions, tokens)" vertex="1">
+          <mxGeometry height="30" width="160" x="1050" y="400" as="geometry" />
         </mxCell>
-
-        <!-- Legend -->
-        <mxCell id="legend_title" value="Legend" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
-          <mxGeometry x="1140" y="210" width="60" height="20" as="geometry" />
+        <mxCell id="legend_title" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=1;fontColor=#333333;" value="Legend" vertex="1">
+          <mxGeometry height="20" width="60" x="1140" y="210" as="geometry" />
         </mxCell>
-        <mxCell id="legend_working" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;" vertex="1" parent="1">
-          <mxGeometry x="1140" y="240" width="20" height="14" as="geometry" />
+        <mxCell id="legend_working" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2d6a4f;strokeColor=#1b4332;" value="" vertex="1">
+          <mxGeometry height="14" width="20" x="1140" y="240" as="geometry" />
         </mxCell>
-        <mxCell id="legend_working_t" value="Working today" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#333333;" vertex="1" parent="1">
-          <mxGeometry x="1170" y="237" width="100" height="20" as="geometry" />
+        <mxCell id="legend_working_t" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#333333;" value="Working today" vertex="1">
+          <mxGeometry height="20" width="100" x="1170" y="237" as="geometry" />
         </mxCell>
-        <mxCell id="legend_ext" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e76f51;strokeColor=#c1440e;" vertex="1" parent="1">
-          <mxGeometry x="1140" y="262" width="20" height="14" as="geometry" />
+        <mxCell id="legend_ext" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e76f51;strokeColor=#c1440e;" value="" vertex="1">
+          <mxGeometry height="14" width="20" x="1140" y="262" as="geometry" />
         </mxCell>
-        <mxCell id="legend_ext_t" value="External API" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#333333;" vertex="1" parent="1">
-          <mxGeometry x="1170" y="259" width="100" height="20" as="geometry" />
+        <mxCell id="legend_ext_t" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#333333;" value="External API" vertex="1">
+          <mxGeometry height="20" width="100" x="1170" y="259" as="geometry" />
         </mxCell>
-        <mxCell id="legend_platform" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;" vertex="1" parent="1">
-          <mxGeometry x="1140" y="284" width="20" height="14" as="geometry" />
+        <mxCell id="legend_platform" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#264653;strokeColor=#1d3557;" value="" vertex="1">
+          <mxGeometry height="14" width="20" x="1140" y="284" as="geometry" />
         </mxCell>
-        <mxCell id="legend_platform_t" value="Platform operator" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#333333;" vertex="1" parent="1">
-          <mxGeometry x="1170" y="281" width="100" height="20" as="geometry" />
+        <mxCell id="legend_platform_t" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#333333;" value="Platform operator" vertex="1">
+          <mxGeometry height="20" width="100" x="1170" y="281" as="geometry" />
         </mxCell>
-        <mxCell id="legend_desired" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;dashed=1;dashPattern=5 3;" vertex="1" parent="1">
-          <mxGeometry x="1140" y="306" width="20" height="14" as="geometry" />
+        <mxCell id="legend_desired" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;dashed=1;dashPattern=5 3;" value="" vertex="1">
+          <mxGeometry height="14" width="20" x="1140" y="306" as="geometry" />
         </mxCell>
-        <mxCell id="legend_desired_t" value="Desired / planned" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#333333;" vertex="1" parent="1">
-          <mxGeometry x="1170" y="303" width="100" height="20" as="geometry" />
+        <mxCell id="legend_desired_t" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#333333;" value="Desired / planned" vertex="1">
+          <mxGeometry height="20" width="100" x="1170" y="303" as="geometry" />
         </mxCell>
-
+        <mxCell id="aidxnsMp1hcu_Z4q9pHU-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e76f51;strokeColor=#c1440e;fontColor=#ffffff;fontSize=11;fontStyle=1;" value="MLFlow" vertex="1">
+          <mxGeometry height="60" width="140" x="940" y="640" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
