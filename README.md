@@ -25,16 +25,19 @@ This repo is the companion to [Operationalizing "Bring Your Own Agent" on Red Ha
 
 One agent, one pod. The developer deploys a standard container. The platform wraps it in infrastructure.
 
-| You bring | The platform adds |
-|-----------|-------------------|
-| Your agent container (any framework, any runtime) | **Discovery** — AgentCard CR auto-indexes your agent via A2A |
-| Your LLM provider keys | **Observability** — OTEL traces to MLflow for every LLM call |
-| Your tools and MCP servers | **Identity** — SPIFFE/SPIRE workload identity (planned) |
-| | **Tool governance** — MCP Gateway with identity-based filtering (planned) |
-| | **Safety** — Guardrails Orchestrator at the inference boundary (planned) |
-| | **Lifecycle** — AgentRuntime CR manages labels, config, rolling updates |
+| You bring | The platform adds | Status |
+|-----------|-------------------|--------|
+| Your agent container (any framework, any runtime) | **Discovery** — AgentCard CR auto-indexes your agent via A2A | Working |
+| Your LLM provider keys | **Observability** — OTEL traces to MLflow for every LLM call | Working (HTTP-level; GenAI-level planned) |
+| Your tools and MCP servers | **Safety** — NeMo Guardrails at the inference boundary (input/output rails, content moderation) | Working via TrustyAI operator |
+| | **Inference gateway** — Llama Stack routes to self-hosted (vLLM) or remote (OpenAI) models through one API | Working |
+| | **Lifecycle** — AgentRuntime CR manages labels, config, rolling updates | Working |
+| | **Identity** — SPIFFE/SPIRE workload identity, token exchange for MCP servers | Planned |
+| | **Tool governance** — MCP Gateway with identity-based filtering | Planned |
+| | **Sandboxing** — VM-level pod isolation (Kata containers / peer pods) | Tested, not practical at scale ([gotchas](docs/gotchas-sandboxed-containers.md)) |
+| | **GenAI traces** — prompts, completions, token counts in MLflow | Planned ([3 paths](docs/gotchas-mlflow-tracing.md#three-paths-to-genai-traces)) |
 
-The platform is framework-agnostic. It doesn't ask you to rewrite your agent or adopt a specific SDK. It wraps your workload in enterprise infrastructure — the same way OpenShift wraps any container in networking, storage, and security without modifying the application.
+The platform is framework-agnostic. It doesn't ask you to rewrite your agent or adopt a specific SDK. It wraps your workload in enterprise infrastructure, the same way OpenShift wraps any container in networking, storage, and security without modifying the application.
 
 OpenClaw doesn't sandbox by default. It doesn't enforce RBAC, trace tool calls, or gate access to external services. Kagenti and Red Hat AI add each of those layers without touching the agent's code.
 
