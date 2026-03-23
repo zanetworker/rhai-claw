@@ -1,4 +1,4 @@
-# kagenti-claw
+# rhai-claw
 
 **No matter where your agent comes from, the platform is your agent's safe haven.**
 
@@ -41,8 +41,8 @@ OpenClaw doesn't sandbox by default. It doesn't enforce RBAC, trace tool calls, 
 ## Quick Start
 
 ```bash
-git clone https://github.com/zanetworker/kagenti-claw.git
-cd kagenti-claw
+git clone https://github.com/zanetworker/rhai-claw.git
+cd rhai-claw
 make deploy
 ```
 

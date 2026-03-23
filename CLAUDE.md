@@ -1,4 +1,4 @@
-# kagenti-claw
+# rhai-claw
 
 Deploy OpenClaw on Kubernetes with the Kagenti operator.
 

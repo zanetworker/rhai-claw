@@ -42,7 +42,7 @@ If anything is MISSING, tell the user:
 > **Ask your platform team to run:**
 > 1. Install the Kagenti operator: `helm install kagenti-operator oci://ghcr.io/kagenti/kagenti-operator/kagenti-operator-chart --version 0.2.0-alpha.22 --namespace kagenti-system --create-namespace`
 > 2. Install the AgentRuntime CRD: `kubectl apply -f https://raw.githubusercontent.com/kagenti/kagenti-operator/main/kagenti-operator/config/crd/bases/agent.kagenti.dev_agentruntimes.yaml`
-> 3. Install the webhook: `kubectl apply -f manifests/webhook/webhook-all.yaml` (from the kagenti-claw repo)
+> 3. Install the webhook: `kubectl apply -f manifests/webhook/webhook-all.yaml` (from the rhai-claw repo)
 > 4. Create and label your namespace: `kubectl create ns <NAMESPACE> && kubectl label namespace <NAMESPACE> kagenti-enabled=true`
 >
 > Once these are in place, re-run `/deploy-openclaw`."
@@ -59,7 +59,7 @@ Do NOT reuse an existing namespace that has other workloads. If the chosen names
 
 ### 3. Check for stale resources
 
-Check if any kagenti-claw resources already exist in the chosen namespace:
+Check if any rhai-claw resources already exist in the chosen namespace:
 ```bash
 kubectl get deploy openclaw -n <NAMESPACE> 2>/dev/null
 kubectl get agentruntime openclaw -n <NAMESPACE> 2>/dev/null
