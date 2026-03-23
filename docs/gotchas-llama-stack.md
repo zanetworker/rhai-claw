@@ -64,15 +64,7 @@ This works from inside the cluster but adds TLS overhead and goes through the ro
 
 The KServe InferenceService keeps creating new predictor pods when the GPU node has issues (node restart, OOM, scheduling failures). Old pods stay in `Init:ContainerStatusUnknown` indefinitely. On our cluster, 4 out of 5 predictor pods were stuck:
 
-```
-llama3-2-8b-predictor-679bcc4888-68bv5   0/2     Init:ContainerStatusUnknown
-llama3-2-8b-predictor-679bcc4888-9wtwn   0/2     Init:ContainerStatusUnknown
-llama3-2-8b-predictor-679bcc4888-c7b6s   0/2     Init:ContainerStatusUnknown
-llama3-2-8b-predictor-679bcc4888-fk6t6   0/2     Init:ContainerStatusUnknown
-llama3-2-8b-predictor-679bcc4888-x8gwk   2/2     Running                        ← only one working
-```
-
-When tailing logs, `oc logs -f -l serving.kserve.io/inferenceservice=llama3-2-8b` may attach to a stuck pod instead of the running one. You need to target the specific running pod by name.
+When tailing logs, `oc logs -f -l serving.kserve.io/inferenceservice=<name>` may attach to a stuck pod instead of the running one. Target the specific running pod by name instead.
 
 ## Configuration: NeMo + vLLM
 
@@ -94,18 +86,6 @@ curl -sk https://<vllm-route>/v1/models | jq '.data[0].id'
 ```
 
 The model ID must exactly match what vLLM serves — it's the `id` field from `/v1/models`, not the HuggingFace model name.
-
-### 4. Don't reuse shared Llama Stack instances — create a dedicated one :warning:
-
-We made this mistake: we modified the `lsd-genai-playground` LlamaStackDistribution (the shared playground instance) to add a `remote::openai` provider. This is wrong — the playground instance is used by other workloads, and adding providers or changing its config affects everyone.
-
-**Correct approach:** Create a **separate** LlamaStackDistribution in the same namespace as your vLLM models. This way:
-- The guardrails Llama Stack instance has its own config, lifecycle, and credentials
-- It can reference the same vLLM InferenceService (same namespace)
-- Switching between `remote::vllm` and `remote::openai` doesn't affect other users
-- You can tear it down without impacting the playground
-
-See the "Deploying a Dedicated Llama Stack Instance" section below for how to do this properly.
 
 ## Deploying a Dedicated Llama Stack Instance
 
