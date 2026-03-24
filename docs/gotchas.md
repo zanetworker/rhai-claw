@@ -20,10 +20,10 @@ The top gotchas across all teams, ranked by how likely they are to block you and
 | 2 | :no_entry: | [TrustyAI / NeMo](#trustyai--safety-team) | [`NemoGuardrail` CRD can't add sidecars or command overrides](gotchas-nemo-guardrails.md#6-nemoguardrail-crd-doesnt-support-custom-commands-no_entry) | Blocks CRD-based deployment |
 | 3 | :no_entry: | [MLflow](#mlflow--observability-team) | [Traces are HTTP-level only, not GenAI-level](gotchas-mlflow-tracing.md#current-state-http-level-traces-only-no_entry) | Architectural gap — see 3 paths |
 | 4 | :no_entry: | [OpenClaw](#openclaw--agent-team) | [`diagnostics-otel` extension broken in image](gotchas-application.md#diagnostics-otel-extension-broken-in-image-no_entry) | Blocks GenAI traces via Path 1 |
-| 5 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [`get_colang_history()` crashes on multi-part content lists](gotchas-nemo-guardrails.md#2-multi-part-content-crashes-get_colang_history-warning) | 3+ hours — error in post-processing, not the obvious path |
-| 6 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [Response format not OpenAI-compatible despite `/v1/chat/completions`](gotchas-nemo-guardrails.md#1-response-format-mismatch-nemo-vs-openai-warning) | 2+ hours — 200 OK but empty responses |
+| 5 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [`get_colang_history()` crashes on multi-part content lists](gotchas-nemo-guardrails.md#2-multi-part-content-crashes-get_colang_history-warning) | **FIXED in 0.15.0+.** Was 3+ hours. |
+| 6 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [Response format not OpenAI-compatible despite `/v1/chat/completions`](gotchas-nemo-guardrails.md#1-response-format-mismatch-nemo-vs-openai-warning) | **FIXED in 0.20.0.** Was 2+ hours. |
 | 7 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [NeMo depends on LangChain for LLM access — provider lock-in](gotchas-nemo-guardrails.md#7-nemo-guardrails-depends-on-langchain-for-llm-access-warning) | Limits which models can evaluate safety. Explore Llama Stack. |
-| 8 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [No streaming support — clients hang or get broken pipes](gotchas-nemo-guardrails.md#3-no-streaming-support-warning) | 1-2 hours |
+| 8 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [No streaming support — clients hang or get broken pipes](gotchas-nemo-guardrails.md#3-no-streaming-support-warning) | 1-2 hours. 0.20.0 added config flag but crashes on `self.stop=None` via Llama Stack. |
 | 9 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [RHOAI image missing `langchain-anthropic` — blocks Anthropic engine](gotchas-nemo-guardrails.md#4-rhoai-image-missing-langchain-anthropic-warning) | 30 min — blocks Anthropic as guardrail evaluator |
 | 10 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [Self-check prompt flags agent metadata as attacks](gotchas-nemo-guardrails.md#5-self-check-prompt-too-sensitive-to-agent-metadata-warning) | 30 min — false positives on every message |
 | 11 | :warning: | [Llama Stack / Inference](#llama-stack--inference-team) | [3B model silently breaks safety rails — guardrails are theater](gotchas-llama-stack.md#1-3b-model-silently-breaks-safety-rails--no-errors-no-warnings-warning) | No errors, no warnings, rails just don't work |
@@ -101,14 +101,16 @@ Owner: TrustyAI operator + NeMo Guardrails integration in RHOAI
 
 | # | Severity | Gotcha | Impact |
 |---|----------|--------|--------|
+| 37 | :no_entry: | NeMo only accepts OpenAI format — can't guard Anthropic Messages API traffic | Agents using Anthropic directly bypass guardrails |
 | 30 | :no_entry: | `NemoGuardrail` CRD can't add sidecars | Blocks CRD deployment path |
-| 2 | :warning: | `get_colang_history()` crashes on list content | Silent crash after response generated |
-| 3 | :warning: | Response format not OpenAI-compatible | 200 OK but empty responses |
-| 7 | :warning: | No streaming support | Clients hang or broken pipes |
+| 7 | :warning: | No streaming support | 0.20.0 added flag but crashes on `self.stop=None` via Llama Stack |
+| 36 | :warning: | NeMo depends on LangChain for LLM access | Provider lock-in, explore Llama Stack / vLLM alternatives |
 | 10 | :warning: | RHOAI image missing `langchain-anthropic` | Blocks Anthropic engine |
 | 12 | :warning: | Self-check prompt too sensitive to metadata | False positives on normal messages |
-| 36 | :warning: | NeMo depends on LangChain for LLM access | Provider lock-in, explore Llama Stack / vLLM alternatives |
-| 37 | :no_entry: | NeMo only accepts OpenAI format — can't guard Anthropic Messages API traffic | Agents using Anthropic directly bypass guardrails |
+| 5 | :bulb: | ~~`get_colang_history()` crashes on list content~~ | **FIXED in 0.15.0+** |
+| 6 | :bulb: | ~~Response format not OpenAI-compatible~~ | **FIXED in 0.20.0** |
+
+**Adapter still needed:** [Why the adapter exists](nemo-adapter-why.md). Streaming and content normalization still require it as of 0.20.0.
 
 **Path to CRD-based deployment:** 5 steps needed across TrustyAI team and NeMo upstream. See [gotchas-nemo-guardrails.md § Path to TrustyAI Service Operator](gotchas-nemo-guardrails.md#path-to-trustyai-service-operator-crd-based-deployment).
 
