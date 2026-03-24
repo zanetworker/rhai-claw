@@ -24,8 +24,8 @@ The top gotchas across all teams, ranked by how likely they are to block you and
 | 6 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [NeMo depends on LangChain for LLM access — provider lock-in](gotchas-nemo-guardrails.md#7-nemo-guardrails-depends-on-langchain-for-llm-access-warning) | Limits which models can evaluate safety. Explore Llama Stack. |
 | 7 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [RHOAI image missing `langchain-anthropic` — blocks Anthropic engine](gotchas-nemo-guardrails.md#4-rhoai-image-missing-langchain-anthropic-warning) | 30 min — blocks Anthropic as guardrail evaluator |
 | 8 | :warning: | [TrustyAI / NeMo](#trustyai--safety-team) | [Self-check prompt flags agent metadata as attacks](gotchas-nemo-guardrails.md#5-self-check-prompt-too-sensitive-to-agent-metadata-warning) | 30 min — false positives on every message |
-| 9 | :white_check_mark: | [TrustyAI / NeMo](#trustyai--safety-team) | [~~`get_colang_history()` crashes on multi-part content~~](gotchas-nemo-guardrails.md#2-multi-part-content-crashes-get_colang_history-warning) | **FIXED in 0.15.0+** |
-| 10 | :white_check_mark: | [TrustyAI / NeMo](#trustyai--safety-team) | [~~Response format not OpenAI-compatible~~](gotchas-nemo-guardrails.md#1-response-format-mismatch-nemo-vs-openai-warning) | **FIXED in 0.20.0** |
+| 9 | ✅ | [TrustyAI / NeMo](#trustyai--safety-team) | [~~`get_colang_history()` crashes on multi-part content~~](gotchas-nemo-guardrails.md#2-multi-part-content-crashes-get_colang_history-warning) | **FIXED in 0.15.0+** |
+| 10 | ✅ | [TrustyAI / NeMo](#trustyai--safety-team) | [~~Response format not OpenAI-compatible~~](gotchas-nemo-guardrails.md#1-response-format-mismatch-nemo-vs-openai-warning) | **FIXED in 0.20.0** |
 | 11 | :warning: | [Llama Stack / Inference](#llama-stack--inference-team) | [3B model silently breaks safety rails — guardrails are theater](gotchas-llama-stack.md#1-3b-model-silently-breaks-safety-rails--no-errors-no-warnings-warning) | No errors, no warnings, rails just don't work |
 | 12 | :warning: | [Kagenti](#kagenti--platform-team) | [Namespace needs `kagenti-enabled=true` — completely silent failure](gotchas-platform-kagenti.md#namespace-needs-kagenti-enabledtrue-label-warning) | 2+ hours — no errors anywhere |
 | 13 | :warning: | [MLflow](#mlflow--observability-team) | [OTLP rejected due to port in Host header — silently drops all traces](gotchas-mlflow-tracing.md#1-mlflow-rejects-otlp-with-port-in-host-header-warning) | 2+ hours — zero indication of failure |
@@ -107,8 +107,8 @@ Owner: TrustyAI operator + NeMo Guardrails integration in RHOAI
 | 36 | :warning: | NeMo depends on LangChain for LLM access | Provider lock-in, explore Llama Stack / vLLM alternatives |
 | 10 | :warning: | RHOAI image missing `langchain-anthropic` | Blocks Anthropic engine |
 | 12 | :warning: | Self-check prompt too sensitive to metadata | False positives on normal messages |
-| 5 | :bulb: | ~~`get_colang_history()` crashes on list content~~ | **FIXED in 0.15.0+** |
-| 6 | :bulb: | ~~Response format not OpenAI-compatible~~ | **FIXED in 0.20.0** |
+| 5 | ✅ | ~~`get_colang_history()` crashes on list content~~ | **FIXED in 0.15.0+** |
+| 6 | ✅ | ~~Response format not OpenAI-compatible~~ | **FIXED in 0.20.0** |
 
 **Adapter still needed:** [Why the adapter exists](nemo-adapter-why.md). Streaming and content normalization still require it as of 0.20.0.
 
