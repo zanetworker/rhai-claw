@@ -9,6 +9,22 @@ Issues encountered integrating NeMo Guardrails with OpenClaw on Red Hat AI. Each
 
 RHOAI image: `quay.io/trustyai/nemo-guardrails-server:latest`. Upstream latest is **0.21.0**.
 
+## Summary by severity
+
+| # | Severity | Gotcha | Status in 0.20.0 |
+|---|----------|--------|-----------------|
+| 8 | :no_entry: | NeMo only accepts OpenAI format — can't guard Anthropic Messages API | All versions. No `/v1/messages` endpoint. |
+| 6 | :no_entry: | `NemoGuardrail` CRD can't add sidecars or command overrides | TrustyAI operator limitation |
+| 3 | :warning: | No streaming — crashes on `self.stop=None` via Llama Stack | NeMo bug, Llama Stack trigger. Adapter works around it. |
+| 7 | :warning: | Depends on LangChain for LLM access — provider lock-in | Architectural. Explore Llama Stack alternative. |
+| 9 | :warning: | Small models (3B) silently break safety rails | Model capability, not NeMo bug. No validation. |
+| 4 | :warning: | RHOAI image missing `langchain-anthropic` | Image packaging gap |
+| 5 | :warning: | Self-check prompt too sensitive to agent metadata | Prompt design issue. Tuned in our config. |
+| 1 | :white_check_mark: | ~~Response format not OpenAI-compatible~~ | **FIXED in 0.20.0** |
+| 2 | :white_check_mark: | ~~`get_colang_history()` crashes on list content~~ | **FIXED in 0.15.0+** |
+
+For the full adapter story (why it exists, what it does, when it can be removed): [docs/nemo-adapter-why.md](nemo-adapter-why.md)
+
 ## Severity
 
 | Rating | Icon | Meaning |
@@ -16,6 +32,7 @@ RHOAI image: `quay.io/trustyai/nemo-guardrails-server:latest`. Upstream latest i
 | **Dead end** | :no_entry: | No workaround on this path. Must change approach. |
 | **Surprising** | :warning: | Not obvious from docs. Costs hours of debugging. |
 | **Obvious** | :bulb: | Expected if you know the tech. |
+| **Fixed** | :white_check_mark: | Resolved in a newer NeMo version. |
 
 ## Surprising
 
@@ -78,7 +95,22 @@ for msg in req_json.get("messages", []):
 
 ### 3. No streaming support :warning:
 
-**Affected version:** 0.18.0, 0.15.0, 0.20.0. **Still broken in 0.20.0.** NeMo 0.20.0 added a `rails.output.streaming.enabled` config flag, but enabling it crashes with `TypeError: 'NoneType' object is not iterable` in `streaming.py` line 206 when `self.stop` is None. This happens when using Llama Stack as the inference proxy (stop sequences aren't returned). Without the flag, `stream:true` returns "Internal server error" with a clear message asking to enable the flag.
+**Affected version:** 0.18.0, 0.15.0, 0.20.0. **Still broken in 0.20.0.**
+
+NeMo 0.20.0 added a `rails.output.streaming.enabled` config flag (progress). But enabling it crashes:
+
+```python
+# nemoguardrails/streaming.py line 206
+for stop_chunk in self.stop:
+                  ^^^^^^^^^
+TypeError: 'NoneType' object is not iterable
+```
+
+**Root cause analysis:** This is a **NeMo bug** triggered by **Llama Stack's behavior**. `self.stop` is populated from the LLM response metadata (stop sequences that signal "stop generating"). When NeMo calls OpenAI directly, OpenAI returns this metadata and `self.stop` is a list. When NeMo calls through Llama Stack, the proxy doesn't relay the `stop` field, so `self.stop` is `None`. NeMo assumes it's always present and crashes.
+
+**Fix (trivial):** `for stop_chunk in (self.stop or []):` in NeMo's streaming handler. Either team could fix it: NeMo by handling `None` (more defensive), or Llama Stack by relaying the `stop` field (more correct). The NeMo fix is simpler.
+
+Without the flag, `stream:true` returns "Internal server error" with a clear message asking to enable the flag.
 
 **Symptom:** OpenClaw sends `"stream": true` in requests. NeMo Guardrails ignores the flag and returns a single JSON response. OpenClaw expects SSE (Server-Sent Events) chunks and shows empty output or "Internal server error."
 
