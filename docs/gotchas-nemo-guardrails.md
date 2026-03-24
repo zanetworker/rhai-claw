@@ -20,8 +20,8 @@ RHOAI image: `quay.io/trustyai/nemo-guardrails-server:latest`. Upstream latest i
 | 9 | :warning: | Small models (3B) silently break safety rails | Model capability, not NeMo bug. No validation. |
 | 4 | :warning: | RHOAI image missing `langchain-anthropic` | Image packaging gap |
 | 5 | :warning: | Self-check prompt too sensitive to agent metadata | Prompt design issue. Tuned in our config. |
-| 1 | ✅ | ~~Response format not OpenAI-compatible~~ | **FIXED in 0.20.0** |
-| 2 | ✅ | ~~`get_colang_history()` crashes on list content~~ | **FIXED in 0.15.0+** |
+| 1 | ✅ | ~~Response format not OpenAI-compatible~~ | **FIXED in 0.20.0 nightly** |
+| 2 | ✅ | ~~`get_colang_history()` crashes on list content~~ | **FIXED in 0.20.0 nightly** |
 
 For the full adapter story (why it exists, what it does, when it can be removed): [docs/nemo-adapter-why.md](nemo-adapter-why.md)
 
