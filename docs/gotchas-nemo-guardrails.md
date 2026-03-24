@@ -78,7 +78,7 @@ for msg in req_json.get("messages", []):
 
 ### 3. No streaming support :warning:
 
-**Affected version:** 0.18.0, 0.15.0, 0.20.0. **Still broken in 0.20.0** (returns "Internal server error" when `stream:true`, non-streaming returns JSON blob).
+**Affected version:** 0.18.0, 0.15.0, 0.20.0. **Still broken in 0.20.0.** NeMo 0.20.0 added a `rails.output.streaming.enabled` config flag, but enabling it crashes with `TypeError: 'NoneType' object is not iterable` in `streaming.py` line 206 when `self.stop` is None. This happens when using Llama Stack as the inference proxy (stop sequences aren't returned). Without the flag, `stream:true` returns "Internal server error" with a clear message asking to enable the flag.
 
 **Symptom:** OpenClaw sends `"stream": true` in requests. NeMo Guardrails ignores the flag and returns a single JSON response. OpenClaw expects SSE (Server-Sent Events) chunks and shows empty output or "Internal server error."
 
