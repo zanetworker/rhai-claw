@@ -2,7 +2,12 @@
 
 Issues encountered integrating NeMo Guardrails with OpenClaw on Red Hat AI. Each gotcha includes the root cause, our workaround, and what should be fixed upstream.
 
-**Version tested:** NeMo Guardrails **0.18.0** in RHOAI image `quay.io/trustyai/nemo-guardrails-server:latest` (RHOAI 3.4.0-ea.2). Upstream latest is **0.21.0**. Some gotchas may be resolved in newer versions but are present in the RHOAI-shipped image.
+**Versions tested:**
+- **0.18.0** — stale RHOAI image (Jan 2026). All 9 gotchas present.
+- **0.15.0** — first nightly refresh (Mar 22). Gotcha #2 (list content crash) fixed.
+- **0.20.0** — latest nightly (Mar 24). Gotchas #1 (response format) and #2 (list content) fixed. Streaming (#3) still broken. New: `model` field now required in requests (422 without it).
+
+RHOAI image: `quay.io/trustyai/nemo-guardrails-server:latest`. Upstream latest is **0.21.0**.
 
 ## Severity
 
@@ -16,7 +21,7 @@ Issues encountered integrating NeMo Guardrails with OpenClaw on Red Hat AI. Each
 
 ### 1. Response format mismatch (NeMo vs OpenAI) :warning:
 
-**Affected version:** 0.18.0 (RHOAI). Status in upstream 0.21.0: unknown.
+**Affected version:** 0.18.0, 0.15.0. **FIXED in 0.20.0** (returns proper `{"choices":[...]}` format). New requirement: `model` field is now mandatory in requests (422 without it).
 
 **Symptom:** OpenClaw shows empty responses. The guardrails service returns 200 OK but the content is missing.
 
@@ -38,7 +43,7 @@ NeMo's docs describe the endpoint as "OpenAI-compatible" but the response shape 
 
 ### 2. Multi-part content crashes `get_colang_history()` :warning:
 
-**Affected version:** 0.18.0 (RHOAI). Crash is in `nemoguardrails/actions/llm/utils.py` line 442. Status in upstream 0.21.0: unknown.
+**Affected version:** 0.18.0. **FIXED in 0.15.0+** (confirmed in 0.15.0 and 0.20.0). Crash was in `nemoguardrails/actions/llm/utils.py` line 442.
 
 **Symptom:** First message works fine. Second message returns "Internal server error." The guardrails correctly blocks/allows the request, generates the response, then crashes during post-processing.
 
@@ -73,7 +78,7 @@ for msg in req_json.get("messages", []):
 
 ### 3. No streaming support :warning:
 
-**Affected version:** 0.18.0 (RHOAI). Status in upstream 0.21.0: unknown.
+**Affected version:** 0.18.0, 0.15.0, 0.20.0. **Still broken in 0.20.0** (returns "Internal server error" when `stream:true`, non-streaming returns JSON blob).
 
 **Symptom:** OpenClaw sends `"stream": true` in requests. NeMo Guardrails ignores the flag and returns a single JSON response. OpenClaw expects SSE (Server-Sent Events) chunks and shows empty output or "Internal server error."
 
