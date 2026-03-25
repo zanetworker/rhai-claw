@@ -57,6 +57,43 @@ The AgentRuntime controller (PR [#218](https://github.com/kagenti/kagenti-operat
 
 **Workaround:** Name the AgentRuntime CR's `targetRef.name` to match the ReplicaSet name pattern, or wait for Phase 2 fix.
 
+### Webhook sidecars blocked by OpenShift restricted-v2 SCC :warning:
+
+**Priority rank: NEW**
+
+When the webhook's sidecar feature gates are enabled (envoy-proxy, spiffe-helper, client-registration), the injected containers require:
+- `NET_ADMIN` + `NET_RAW` capabilities (proxy-init needs iptables for traffic redirection)
+- Custom `runAsUser` values (1337 for envoy, 1000 for spiffe-helper)
+
+OpenShift's default `restricted-v2` SCC blocks all of these:
+
+```
+pods "openclaw-669d78cff8-" is forbidden: unable to validate against any security context constraint:
+  restricted-v2: .initContainers[1].capabilities.add: Invalid value: "NET_ADMIN"
+  restricted-v2: .containers[1].runAsUser: Invalid value: 1337
+  restricted-v2: .containers[2].runAsUser: Invalid value: 1000
+```
+
+The pod never starts. No error in the webhook logs — the webhook succeeds at injection, but the kubelet rejects the pod afterward.
+
+**Why it's surprising:** The webhook installs and injects successfully. The Deployment creates a ReplicaSet. But no pods appear. The SCC error is only visible via `oc describe rs` or `oc get events`, not in the webhook or operator logs.
+
+**Workaround:** Either disable sidecars via feature gates (for guardrails-only testing):
+```yaml
+# kagenti-webhook-feature-gates ConfigMap
+clientRegistration: false
+envoyProxy: false
+spiffeHelper: false
+```
+
+Or grant a permissive SCC to the service account:
+```bash
+oc adm policy add-scc-to-user anyuid -z default -n openclaw
+oc adm policy add-scc-to-user privileged -z default -n openclaw
+```
+
+**What should be fixed:** The webhook should check the namespace's SCC capabilities before injecting sidecars, or the docs should clearly state the SCC prerequisites. The Helm chart could optionally create a custom SCC with only the needed capabilities.
+
 ## Obvious
 
 ### AgentCard `SYNCED=False` for non-A2A agents :bulb:
