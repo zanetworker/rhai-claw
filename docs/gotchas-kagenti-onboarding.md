@@ -14,46 +14,51 @@ Field feedback and friction points from onboarding agents onto the Kagenti platf
 
 ### Webhook adds onboarding complexity :warning:
 
-Installing the kagenti-extensions webhook is an extra cluster-wide step before any agent can be deployed. The webhook requires:
-- Its own namespace (`kagenti-webhook-system`)
-- ClusterRole + ClusterRoleBinding for AgentRuntime reads
-- Namespace labeling (`kagenti-enabled=true`) — silent failure if missing
-- TLS cert management for admission webhooks
+**Status (2026-03-25): WEBHOOK NOW DOES REAL WORK.** The question "what does this webhook do?" now has a solid answer. The webhook injects up to 4 sidecars with a per-sidecar precedence chain, all controlled by feature gates:
 
-From a field perspective, this is real friction. A platform admin asks "what does this webhook do?" and the answer today is: injects OTEL env vars (if patched) and potentially sidecars (SPIFFE, Envoy — both planned). That's a hard sell for a cluster-wide admission webhook.
+| Sidecar | Purpose | Feature Gate |
+|---------|---------|-------------|
+| **envoy-proxy** | Outbound/inbound traffic interception, OAuth2 token exchange | `envoyProxy` |
+| **proxy-init** | iptables setup for traffic redirection (init container) | Follows envoy-proxy |
+| **spiffe-helper** | SPIRE workload identity (x509/JWT SVIDs) | `spiffeHelper` |
+| **client-registration** | Keycloak OAuth2 client auto-registration | `clientRegistration` |
 
-**Question for the team:** What else will the webhook do? If the roadmap includes identity injection (SPIFFE), MCP Gateway sidecar, or policy enforcement, the webhook earns its keep. If it's only for OTEL env vars, a simpler mechanism (operator-managed ConfigMap, pod annotation → controller) would reduce the blast radius.
+New features since initial assessment:
+- **Combined sidecar mode** (`combinedSidecar` gate): merges envoy + spiffe + client-reg into single `authbridge` container
+- **Per-workload config resolution** (`perWorkloadConfigResolution` gate): webhook reads namespace ConfigMaps and AgentRuntime CRs at admission time for literal env var injection
+- **Opt-out semantics**: `kagenti.io/inject=disabled` on a workload skips injection; `kagenti.io/spire=disabled` skips SPIFFE only
+- **Tool workload support**: `kagenti.io/type=tool` with `injectTools` gate
+- **Port exclusion annotations**: `kagenti.io/outbound-ports-exclude`, `kagenti.io/inbound-ports-exclude`
 
-**What would help:**
-- Document the webhook's current and planned capabilities in a single table
-- Consider making the webhook optional — the operator should work without it, with reduced functionality
-- If the webhook stays required, bundle it in the operator Helm chart instead of a separate install
+**Still missing:** OTEL trace env var injection. The webhook reads trace config from AgentRuntime CRs but doesn't inject `OTEL_EXPORTER_OTLP_ENDPOINT` into the agent container. This still requires the patched fork.
+
+**What would still help:**
+- Bundle webhook in operator Helm chart instead of separate install
+- Add OTEL trace injection independent of sidecar decisions
 
 ### One AgentRuntime per Deployment feels heavyweight :warning:
 
-Today, every agent Deployment needs its own AgentRuntime CR:
+**Status (2026-03-25): PARTIALLY ADDRESSED.** The AgentRuntime controller now implements 3-layer config merge: cluster-level ConfigMap (`kagenti-webhook-defaults`) → namespace-level ConfigMap (labeled `kagenti.io/defaults=true`) → per-CR overrides. This means the common case (default trace/identity) only needs namespace-level defaults — not a per-Deployment CR. The AgentRuntime CR is now only needed for per-workload overrides.
+
+However, the `kagenti.io/type: agent` label is still required on every Deployment, and the webhook still requires the namespace label `kagenti-enabled=true`. The dream of "deploy pod, platform detects it" is closer but not there yet.
 
 ```yaml
 apiVersion: agent.kagenti.dev/v1alpha1
 kind: AgentRuntime
 metadata:
-  name: my-agent        # 1:1 with Deployment
+  name: my-agent        # Only needed for per-workload overrides
 spec:
+  type: agent            # Now an enum: agent | tool
   targetRef:
+    apiVersion: apps/v1  # apiVersion now required
     kind: Deployment
     name: my-agent
 ```
 
-In a multi-tenant namespace where 10 developers deploy 10 agents, that's 10 AgentRuntime CRs. Each developer needs to know about Kagenti CRDs, understand `targetRef`, and create the CR alongside their Deployment.
-
-**What developers expect:** "I deploy my pod. The platform detects it and does the right thing."
-
-**What they get:** "Deploy your pod, then also create this CR, then also label the namespace, then also check if the webhook is installed."
-
-**Options to reduce friction:**
-- **Namespace-level defaults:** A single `AgentRuntimeDefaults` CR per namespace that applies to all Deployments with a label (e.g., `kagenti.io/type: agent`). No per-Deployment CR needed for the common case.
-- **Auto-discovery:** The operator watches for Deployments with `kagenti.io/type: agent` label and auto-creates AgentRuntime CRs. Developer only adds a label.
-- **Annotation-based:** Put trace config, identity config directly in Deployment annotations. No CRD needed at all for simple cases.
+**Remaining friction:**
+- AgentRuntime CR still needed if you want custom trace/identity per-workload
+- No auto-discovery — operator doesn't watch for labeled Deployments and auto-create CRs
+- Namespace-level defaults ConfigMap must be manually created
 
 ### Debugging is hard when things go wrong :warning:
 

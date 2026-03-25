@@ -45,11 +45,11 @@ The top gotchas across all teams, ranked by how likely they are to block you and
 | 27 | :bulb: | [Sandboxed Containers](#openshift-sandboxed-containers--security-team) | [KataConfig reboots worker nodes (10-60 min)](gotchas-sandboxed-containers.md#2-kataconfig-reboots-worker-nodes-10-60-min) | Expected, but painful without kataConfigPoolSelector |
 | 28 | :bulb: | [Kagenti](#kagenti--platform-team) | [Empty secrets cause silent failures](gotchas-platform-kagenti.md#empty-secrets-cause-silent-failures-bulb) | 10 min |
 | 29 | :bulb: | [OpenClaw](#openclaw--agent-team) | [Gateway token regenerates on restart](gotchas-application.md#gateway-token-regenerates-on-every-restart-bulb) | 5 min per restart |
-| 30 | :bulb: | [Kagenti](#kagenti--platform-team) | [AgentRuntime CRD not in Helm chart](gotchas-platform-kagenti.md#agentruntime-crd-not-in-helm-chart-bulb) | 5 min — manual install |
+| 30 | :bulb: | [Kagenti](#kagenti--platform-team) | [AgentRuntime CRD not in Helm chart](gotchas-platform-kagenti.md#agentruntime-crd-not-in-helm-chart-bulb) | 5 min — CRD exists but Helm chart doesn't package it |
 | 31 | :bulb: | [Kagenti](#kagenti--platform-team) | [CRDs get stuck terminating](gotchas-platform-kagenti.md#crds-get-stuck-terminating-bulb) | 5 min — patch finalizers |
 | 32 | :bulb: | [MLflow](#mlflow--observability-team) | [Experiment ID must be header](gotchas-mlflow-tracing.md#3-mlflow-experiment-id-must-be-passed-as-header-bulb) | 5 min |
 | 33 | :bulb: | [OpenClaw](#openclaw--agent-team) | [Device pairing required after reconnect](gotchas-application.md#device-pairing-required-after-every-reconnect-bulb) | UX friction, but adds security (prevents unauthorized access) |
-| 34 | :bulb: | [Kagenti](#kagenti--platform-team) | [Deployment name mismatch in webhook](gotchas-platform-kagenti.md#deployment-name-mismatch-in-webhook-bulb) | Patched in fork |
+| 34 | :warning: | [Kagenti](#kagenti--platform-team) | [Deployment name mismatch in webhook](gotchas-platform-kagenti.md#deployment-name-mismatch-in-webhook-warning) | Still open — Phase 2 (issue #177) |
 | 35 | :bulb: | [Kagenti](#kagenti--platform-team) | [AgentCards CRD only from Helm first-install](gotchas-platform-kagenti.md#agentcards-crd-only-from-helm-first-install-bulb) | Avoid deleting CRDs |
 | 36 | :bulb: | [OpenClaw](#openclaw--agent-team) | [Browser automation broken in container](gotchas-application.md#browser-automation-broken-bulb) | No Chrome in image |
 | 37 | :bulb: | [MLflow](#mlflow--observability-team) | [OTEL export errors are silent](gotchas-mlflow-tracing.md#2-otel-export-errors-are-silent-warning) | Set OTEL_LOG_LEVEL=debug |
@@ -84,8 +84,8 @@ Owner: Kagenti operator + kagenti-extensions
 | 4 | :warning: | Namespace needs `kagenti-enabled=true` label | Silent failure — webhook never fires |
 | 11 | :warning: | `spec.trace` doesn't inject OTEL env vars | Trace config does nothing |
 | 14 | :warning: | Webhook early return bypasses trace injection | Only when sidecars disabled |
-| 26 | :bulb: | Deployment name mismatch in webhook | AgentRuntime lookup fails |
-| 21 | :bulb: | AgentRuntime CRD not in Helm chart | Manual install needed |
+| 26 | :warning: | Deployment name mismatch in webhook | AgentRuntime lookup fails — Phase 2 (issue #177) |
+| 21 | :bulb: | AgentRuntime CRD not in Helm chart | CRD exists but chart doesn't package it |
 | 22 | :bulb: | CRDs get stuck terminating | Patch finalizers |
 | 23 | :bulb: | Empty secrets cause silent failures | Skill verifies content length |
 | 25 | :bulb: | AgentCard SYNCED=False for non-A2A agents | ConfigMap fetcher workaround |

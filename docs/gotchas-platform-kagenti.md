@@ -29,9 +29,9 @@ kubectl label namespace agents kagenti-enabled=true
 
 **Priority rank: #11**
 
-The AgentRuntime controller (PR [#218](https://github.com/kagenti/kagenti-operator/pull/218)) processes `spec.trace` by including it in a SHA256 config hash. When the hash changes, the controller stamps a new annotation, triggering a rolling update. But the new pods come up identical — the controller never writes `OTEL_EXPORTER_OTLP_ENDPOINT` to the container's env vars.
+**Status (2026-03-25): STILL OPEN.** The webhook reads trace overrides from AgentRuntime (`ReadAgentRuntimeOverrides()` extracts `TraceEndpoint`, `TraceProtocol`, `TraceSamplingRate`) and passes them through `ResolveConfig()`, but no code path in `ContainerBuilder` emits `OTEL_EXPORTER_OTLP_ENDPOINT` env vars into the agent container. The sidecars (envoy, spiffe-helper, client-registration) are injected but OTEL tracing env vars are not.
 
-The webhook has the resolution pipeline (`ReadAgentRuntimeOverrides()` → `ResolveConfig()`) but `ContainerBuilder` never emits the env vars.
+The AgentRuntime controller (PR [#218](https://github.com/kagenti/kagenti-operator/pull/218)) processes `spec.trace` by including it in a SHA256 config hash. When the hash changes, the controller stamps a `kagenti.io/config-hash` annotation, triggering a rolling update. But the new pods come up identical — the controller never writes `OTEL_EXPORTER_OTLP_ENDPOINT` to the container's env vars.
 
 **Why it's surprising:** The CR has a `trace` field. You set it. The pod restarts. But nothing changes. No error, no warning. The config hash changes prove the controller sees the trace config — it just doesn't act on it.
 
@@ -41,19 +41,21 @@ The webhook has the resolution pipeline (`ReadAgentRuntimeOverrides()` → `Reso
 
 **Priority rank: #14**
 
-When all sidecar feature gates are disabled, `AnyInjected()` returns false and the function exits before reaching the trace injection code. Trace injection should be independent of sidecar decisions.
+**Status (2026-03-25): STILL OPEN.** `AnyInjected()` checks `EnvoyProxy || SpiffeHelper || ClientRegistration`. When all sidecar feature gates are disabled, `AnyInjected()` returns false and `InjectAuthBridge()` exits at line 157-159 before any trace injection could happen. There is still no separate OTEL trace injection path independent of sidecar decisions.
 
 **Why it's surprising:** Only surfaces when you don't want sidecars (SPIFFE, Envoy) but do want OTEL tracing. The common case in lightweight deployments.
 
 **Fix:** Patched in same fork — checks trace injection independently.
 
-### Deployment name mismatch in webhook :bulb:
+### Deployment name mismatch in webhook :warning:
 
 **Priority rank: #26**
 
-The webhook receives the pod's `GenerateName` which is the ReplicaSet name (e.g., `openclaw-748648db65`), but `AgentRuntime.spec.targetRef.name` is the Deployment name (`openclaw`). AgentRuntime lookup fails.
+**Status (2026-03-25): STILL OPEN.** `deriveWorkloadName()` in `authbridge_webhook.go` returns the ReplicaSet name by trimming the trailing `-` from `GenerateName` (e.g., `openclaw-748648db65`). But `AgentRuntime.spec.targetRef.name` is the Deployment name (`openclaw`). The `ReadAgentRuntimeOverrides()` function matches `targetRef.name` against this derived name — mismatch. The code comments say "Resolving the Deployment name requires a ReplicaSet owner-ref lookup, which is planned for Phase 2 (issue #177)."
 
-**Fix:** Strip the `pod-template-hash` suffix using the pod's label.
+**Impact:** AgentRuntime per-workload overrides (trace, identity) are never applied to controller-managed pods. Only bare pods (with explicit Name) work correctly.
+
+**Workaround:** Name the AgentRuntime CR's `targetRef.name` to match the ReplicaSet name pattern, or wait for Phase 2 fix.
 
 ## Obvious
 
@@ -71,11 +73,13 @@ The AgentCard controller tries to fetch from `/.well-known/agent-card.json` over
 
 **Priority rank: #21**
 
-The CRD was added in [#218](https://github.com/kagenti/kagenti-operator/pull/218) and merged, but the Helm chart hasn't been updated. Manual install:
+**Status (2026-03-25): PARTIALLY FIXED.** The CRD exists at `config/crd/bases/agent.kagenti.dev_agentruntimes.yaml` in the repo, but the Helm chart's `crds/` directory only contains `agent.kagenti.dev_agentcards.yaml`. Still needs manual install:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kagenti/kagenti-operator/main/kagenti-operator/config/crd/bases/agent.kagenti.dev_agentruntimes.yaml
 ```
+
+The AgentRuntime controller is registered in `cmd/main.go` and works — it's just the Helm chart packaging that's behind.
 
 ### CRDs get stuck terminating :bulb:
 
@@ -112,4 +116,6 @@ A secret in the `agents` namespace is not visible in the `openclaw` namespace. C
 
 ### Webhook needs RBAC for AgentRuntime reads :bulb:
 
-The webhook needs `get/list/watch` on `agentruntimes.agent.kagenti.dev`. Without this, it logs `"AgentRuntime CRD not available or list failed"` and falls back to no trace config. The bundled `manifests/webhook/webhook-all.yaml` includes the RBAC. The upstream Helm chart does not.
+**Status (2026-03-25): STILL OPEN.** The webhook needs `get/list/watch` on `agentruntimes.agent.kagenti.dev`. Without this, it logs `"AgentRuntime CRD not available or list failed"` and falls back to no trace config. The bundled `manifests/webhook/webhook-all.yaml` includes the RBAC. The upstream webhook Helm chart still does not include this RBAC.
+
+The webhook's `ReadAgentRuntimeOverrides()` gracefully degrades (returns nil, nil) when the CRD isn't installed or RBAC is missing, so the webhook itself doesn't crash — it just ignores per-workload overrides silently.
