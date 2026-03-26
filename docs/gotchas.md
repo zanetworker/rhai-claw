@@ -32,7 +32,7 @@ The top gotchas across all teams, ranked by how likely they are to block you and
 | 14 | :warning: | [OpenClaw](#openclaw--agent-team) | [Multi-part content format breaks downstream tools](gotchas-application.md#multi-part-content-format-breaks-downstream-tools-warning) | 1+ hours — linked to NeMo crash (#5) |
 | 15 | :warning: | [Kagenti](#kagenti--platform-team) | [`spec.trace` doesn't inject OTEL env vars — webhook bug](gotchas-platform-kagenti.md#spectrace-doesnt-inject-otel-env-vars-warning) | 1+ hours — trace config exists but does nothing |
 | 16 | :warning: | [Kagenti](#kagenti--platform-team) | [Webhook early return bypasses trace injection](gotchas-platform-kagenti.md#webhook-early-return-bypasses-trace-injection-warning) | 1 hour — only when sidecars disabled |
-| 41 | :warning: | [Kagenti](#kagenti--platform-team) | [Webhook sidecars blocked by OpenShift restricted-v2 SCC](gotchas-platform-kagenti.md#webhook-sidecars-blocked-by-openshift-restricted-v2-scc-warning) | Pod never starts, error only in RS events |
+| 41 | :warning: | [Kagenti](#kagenti--platform-team) | [Webhook sidecars require 3 security overrides on OpenShift](gotchas-platform-kagenti.md#webhook-sidecars-require-3-security-overrides-on-openshift-warning) | SCC + PSA + SPIRE needed, none on vanilla K8s |
 | 17 | :warning: | [Llama Stack / Inference](#llama-stack--inference-team) | [KServe headless service not reachable cross-namespace](gotchas-llama-stack.md#2-kserve-headless-service-not-reachable-from-other-namespaces-warning) | Must use Route instead of internal service |
 | 18 | :warning: | [Sandboxed Containers](#openshift-sandboxed-containers--security-team) | [Port 15150 not in SG — peer pod VM created but unreachable](gotchas-sandboxed-containers.md#4-port-15150-not-open--peer-pod-created-but-unreachable) | 1-2 hours — looks like it should work |
 | 19 | :warning: | [Sandboxed Containers](#openshift-sandboxed-containers--security-team) | [Pod VM AMI creation fails on S3/IAM — no retry](gotchas-sandboxed-containers.md#3-pod-vm-ami-creation-fails-silently-on-iams3-issues) | 1-2 hours — fragile auto-provisioning |
@@ -91,7 +91,7 @@ Owner: Kagenti operator + kagenti-extensions
 | 23 | :bulb: | Empty secrets cause silent failures | Skill verifies content length |
 | 25 | :bulb: | AgentCard SYNCED=False for non-A2A agents | ConfigMap fetcher workaround |
 | 27 | :bulb: | AgentCards CRD only from Helm first-install | Don't delete CRDs |
-| 41 | :warning: | Webhook sidecars blocked by restricted-v2 SCC | Pod never starts, need SCC or disable sidecars |
+| 41 | :warning: | Webhook sidecars require 3 security overrides on OpenShift | SCC + PSA + SPIRE, none needed on vanilla K8s |
 
 Full details: [gotchas-platform-kagenti.md](gotchas-platform-kagenti.md)
 

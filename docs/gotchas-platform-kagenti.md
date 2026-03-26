@@ -57,7 +57,7 @@ The AgentRuntime controller (PR [#218](https://github.com/kagenti/kagenti-operat
 
 **Workaround:** Name the AgentRuntime CR's `targetRef.name` to match the ReplicaSet name pattern, or wait for Phase 2 fix.
 
-### Webhook sidecars blocked by OpenShift restricted-v2 SCC :warning:
+### Webhook sidecars require 3 security overrides on OpenShift :warning:
 
 **Priority rank: NEW**
 
@@ -92,7 +92,26 @@ oc adm policy add-scc-to-user anyuid -z default -n openclaw
 oc adm policy add-scc-to-user privileged -z default -n openclaw
 ```
 
-**What should be fixed:** The webhook should check the namespace's SCC capabilities before injecting sidecars, or the docs should clearly state the SCC prerequisites. The Helm chart could optionally create a custom SCC with only the needed capabilities.
+**The full list of overrides needed on OpenShift (none needed on vanilla Kubernetes):**
+
+1. **SCC on the entire SA group** (not just `default` SA — webhook creates new SAs per pod for SPIRE identity):
+```bash
+oc adm policy add-scc-to-group privileged system:serviceaccounts:<namespace>
+```
+
+2. **PSA label on namespace** (SPIFFE CSI inline volumes blocked by `restricted` PSA):
+```bash
+oc label namespace <namespace> pod-security.kubernetes.io/enforce=privileged --overwrite
+```
+
+3. **SPIRE installed on cluster** (Zero Trust Workload Identity Manager operator + SpireServer, SpireAgent, SpiffeCSIDriver CRs)
+
+**Additional missing pieces:**
+- `spiffe-helper-config` and `envoy-config` ConfigMaps must be created manually per namespace. Webhook injects mounts referencing them but doesn't create them. Pods hang on `FailedMount`.
+- proxy-init iptables may fail with `nf_tables` kernel module issues on some nodes.
+- SpireAgent CR needs `nodeAttestor.k8sPSATEnabled: "true"` and `workloadAttestors` — crashes without them, not set by default in the sample.
+
+**What should be fixed:** The webhook Helm chart should detect OpenShift and either auto-create the SCC/PSA configuration, create the required ConfigMaps with defaults, or document all prerequisites. Currently the pod silently fails to start and errors are only visible in ReplicaSet events.
 
 ## Obvious
 
