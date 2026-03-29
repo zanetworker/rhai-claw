@@ -20,6 +20,7 @@ RHOAI image: `quay.io/trustyai/nemo-guardrails-server:latest`. Upstream latest i
 | 9 | :warning: | Small models (3B) silently break safety rails | Model capability, not NeMo bug. No validation. |
 | 4 | :warning: | RHOAI image missing `langchain-anthropic` | Image packaging gap |
 | 5 | :warning: | Self-check prompt too sensitive to agent metadata | Prompt design issue. Tuned in our config. |
+| 10 | :warning: | No built-in authentication — can't verify caller identity or exchange tokens | All versions. Needs auth proxy sidecar if Llama Stack uses JWT auth. |
 | 1 | ✅ | ~~Response format not OpenAI-compatible~~ | **FIXED in 0.20.0 nightly** |
 | 2 | ✅ | ~~`get_colang_history()` crashes on list content~~ | **FIXED in 0.20.0 nightly** |
 
@@ -352,3 +353,39 @@ Port 8080 (Service target)     Port 8000 (NeMo internal)
 ```
 
 The adapter is ~80 lines of Python using only stdlib (`http.server`, `json`, `urllib`). No dependencies to install. It handles all the format bridging so NeMo Guardrails sees clean string-content, non-streaming requests.
+
+## Gotcha 10: No built-in authentication
+
+**Severity:** :warning: Medium
+**Versions:** All (verified against 0.20.0, [server/api.py](https://github.com/NVIDIA/NeMo-Guardrails/blob/develop/nemoguardrails/server/api.py))
+
+### What happens
+
+NeMo Guardrails has no JWT verification, no authentication middleware, and no way to validate caller identity. The FastAPI server has CORS middleware only. The only auth-related code is forwarding the `Authorization` header from the incoming request to the downstream LLM — that's passthrough, not verification. Any pod that can reach the NeMo service can send requests.
+
+### Why it matters
+
+In an identity-aware stack where Llama Stack uses its built-in OAuth2TokenAuthProvider (JWKS validation, audience checking, ABAC), NeMo becomes the weak link. The intended chain is:
+
+1. Agent gets a JWT scoped to audience `nemo-guardrails`
+2. NeMo verifies the token (proves the caller is an authorized agent)
+3. NeMo exchanges its own SPIFFE identity for a JWT scoped to audience `llama-stack`
+4. Llama Stack verifies the token (proves the caller is NeMo, not a rogue agent)
+
+Without auth, NeMo can't do step 2 (verify inbound) or step 3 (exchange outbound). If the agent sends a `llama-stack`-scoped token and NeMo just passes it through, agents can reuse that same token to call Llama Stack directly, bypassing guardrails. The audience-based enforcement chain breaks.
+
+### Workaround
+
+**If Llama Stack uses NetworkPolicy only (no JWT):** No workaround needed. NeMo calls Llama Stack over plain HTTP. NetworkPolicy restricts who can reach NeMo (agent pods only) and who can reach Llama Stack (NeMo pods only). No identity verification, but network-level enforcement works.
+
+**If Llama Stack uses JWT auth:** Deploy a lightweight auth proxy sidecar on NeMo. The proxy needs two functions:
+- Reverse proxy (inbound): verifies JWTs from agents
+- Forward proxy (outbound): exchanges NeMo's SPIFFE JWT-SVID for a Keycloak token scoped to `llama-stack` audience
+
+The proxy should need no NET_ADMIN, no iptables, no privileged SCC. NeMo binds to localhost, the proxy handles all external-facing traffic.
+
+### What should be fixed
+
+NeMo should support pluggable authentication middleware, similar to what Llama Stack already has (OAuth2TokenAuthProvider with JWKS, introspection, and Kubernetes token support). This would allow NeMo to verify caller identity natively without a sidecar.
+
+Upstream issue unlikely to be prioritized by NVIDIA since their deployment model assumes NeMo runs in trusted environments. For Red Hat AI, the auth proxy sidecar is the pragmatic path.
